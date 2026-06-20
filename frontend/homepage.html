@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<style>
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;}
+  body{margin:0;background:#faf9f5;color:#141413;font-family:'Inter',sans-serif;}
+  ::selection{background:#e8d8cf;color:#141413;}
+  img{display:block;max-width:100%;}
+  @keyframes hw-belt{from{background-position-x:0}to{background-position-x:-40px}}
+  @keyframes hw-wave{0%,100%{transform:scaleY(0.2)}50%{transform:scaleY(1)}}
+  @keyframes hw-blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+  @keyframes hw-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  @keyframes hw-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  @keyframes hw-spin-rev{from{transform:rotate(0)}to{transform:rotate(-360deg)}}
+  @keyframes hw-dot{0%,100%{opacity:0.4}50%{opacity:1}}
+  @keyframes hw-heal{0%,18%{width:0}48%,100%{width:100%}}
+  @keyframes hw-fade-x{0%,28%{opacity:1}52%,100%{opacity:0}}
+  @keyframes hw-pop{0%,30%{transform:scale(0)}50%{transform:scale(1.2)}62%,100%{transform:scale(1)}}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important}}
+</style>
+</helmet>
+
+<div ref="{{ setRoot }}" style="position:relative;width:100%;overflow-x:hidden;">
+
+<sc-if value="{{ isLogin }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;inset:0;z-index:200;background:#faf9f5;display:flex;align-items:center;justify-content:center;padding:24px;">
+    <div style="width:100%;max-width:392px;text-align:center;">
+      <div style="display:flex;justify-content:center;margin-bottom:20px;"><img src="assets/mark.png" alt="Claude Hardware" style="width:76px;height:76px;object-fit:contain;mix-blend-mode:multiply;"></div>
+      <h1 style="font-family:'Newsreader',serif;font-weight:400;font-size:30px;letter-spacing:-0.6px;line-height:1.1;margin:0 0 10px;color:#141413;">Sign in to start designing.</h1>
+      <p style="font-size:15px;color:#6c6a64;margin:0 0 28px;line-height:1.5;">Your projects, print files, and history, all in one place.</p>
+      <button onClick="{{ doGoogle }}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:11px;background:#faf9f5;border:1px solid #e6dfd8;border-radius:8px;padding:12px 18px;cursor:pointer;font-family:'Inter';font-weight:500;font-size:15px;color:#141413;height:48px;" style-hover="background:#f5f0e8;border-color:#d8cfc2;">
+        {{ googleG }}
+        <span>Continue with Google</span>
+      </button>
+      <div style="font-size:12px;color:#8e8b82;margin-top:18px;line-height:1.6;">By continuing you agree to the Terms and Privacy Policy.</div>
+      <div onClick="{{ goLanding }}" style="font-size:13px;color:#6c6a64;margin-top:28px;cursor:pointer;font-weight:500;" style-hover="color:#141413;">← Back to site</div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isLanding }}" hint-placeholder-val="{{ true }}">
+
+<nav ref="{{ setNav }}" style="position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(250,249,245,0.88);border-bottom:1px solid transparent;transition:border-color .3s ease;">
+  <div style="max-width:1200px;margin:0 auto;padding:0 24px;height:64px;display:flex;align-items:center;gap:30px;">
+    <a href="#top" style="display:flex;align-items:center;gap:9px;text-decoration:none;color:#141413;">
+      <img src="assets/mark.png" alt="Claude Hardware" style="width:34px;height:34px;object-fit:contain;mix-blend-mode:multiply;">
+      <span style="font-family:'Newsreader',serif;font-weight:500;font-size:18px;letter-spacing:-0.3px;">Claude</span>
+      <span style="font-family:'Inter';font-weight:500;font-size:14px;color:#6c6a64;letter-spacing:0.2px;border-left:1px solid #e6dfd8;padding-left:9px;">Hardware</span>
+    </a>
+    <div style="display:none;gap:26px;margin-left:10px;" data-nav-links="">
+      <a href="#how" style="font-family:'Inter';font-weight:500;font-size:14px;color:#3d3d3a;text-decoration:none;" style-hover="color:#cc785c;">How it works</a>
+      <a href="#parts" style="font-family:'Inter';font-weight:500;font-size:14px;color:#3d3d3a;text-decoration:none;" style-hover="color:#cc785c;">Engineering</a>
+      <a href="#engines" style="font-family:'Inter';font-weight:500;font-size:14px;color:#3d3d3a;text-decoration:none;" style-hover="color:#cc785c;">Engines</a>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+      <button onClick="{{ goLogin }}" style="background:transparent;border:none;border-radius:8px;padding:10px 14px;cursor:pointer;font-family:'Inter';font-weight:500;font-size:14px;color:#141413;" style-hover="color:#cc785c;">Log in</button>
+      <button onClick="{{ goLogin }}" style="background:#cc785c;border:none;border-radius:8px;padding:0 18px;height:40px;cursor:pointer;font-family:'Inter';font-weight:500;font-size:14px;color:#ffffff;" style-hover="background:#a9583e;">Start designing</button>
+    </div>
+  </div>
+</nav>
+
+<main style="position:relative;">
+
+<!-- ============ HERO ============ -->
+<section id="top" style="max-width:1200px;margin:0 auto;padding:132px 24px 72px;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;">
+  <div>
+    <div data-reveal="" style="font-family:'Inter';font-weight:500;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#cc785c;margin-bottom:20px;">3D printing, designed for you</div>
+    <h1 data-reveal="" style="font-family:'Newsreader',serif;font-weight:400;font-size:66px;line-height:1.02;letter-spacing:-1.8px;margin:0 0 22px;color:#141413;">Describe it.<br>We make it<br>printable.</h1>
+    <p data-reveal="" style="font-size:18px;line-height:1.55;color:#3d3d3a;max-width:454px;margin:0 0 30px;">Say what you want. A phone stand, a dragon, a replacement knob. Claude Hardware designs it, fixes it for your printer, and hands you a file that is ready to print.</p>
+    <div data-reveal="" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <button onClick="{{ goLogin }}" style="background:#cc785c;border:none;border-radius:8px;padding:0 22px;height:48px;cursor:pointer;font-family:'Inter';font-weight:500;font-size:16px;color:#ffffff;" style-hover="background:#a9583e;">Start designing</button>
+      <a href="#how" style="display:flex;align-items:center;gap:8px;background:#faf9f5;border:1px solid #e6dfd8;border-radius:8px;padding:0 20px;height:48px;font-family:'Inter';font-weight:500;font-size:16px;color:#141413;text-decoration:none;" style-hover="background:#f5f0e8;">Watch it build</a>
+    </div>
+  </div>
+  <div data-reveal="" style="position:relative;">
+    <div data-printer="" style="position:relative;">
+      <img src="assets/printer.png" alt="Isometric illustration of the Claude Hardware 3D printer building an object" style="width:100%;mix-blend-mode:multiply;">
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS / CONVEYOR ============ -->
+<section id="how" style="background:#f5f0e8;border-top:1px solid #e6dfd8;border-bottom:1px solid #e6dfd8;padding:92px 0;overflow:hidden;">
+  <div style="max-width:1200px;margin:0 auto;padding:0 24px;">
+    <div data-reveal="" style="max-width:660px;margin-bottom:40px;">
+      <div style="font-family:'Inter';font-weight:500;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#cc785c;margin-bottom:16px;">How it works</div>
+      <h2 style="font-family:'Newsreader',serif;font-weight:400;font-size:44px;line-height:1.05;letter-spacing:-1.2px;margin:0 0 14px;color:#141413;">One engine, from words to finished prints.</h2>
+      <p style="font-size:17px;line-height:1.55;color:#3d3d3a;margin:0;max-width:560px;">Your prompt and the tools Claude drives, Blender, OpenSCAD, and Bambu Studio, feed the engine. Print ready models come out the other side.</p>
+    </div>
+  </div>
+  <div data-reveal="" style="max-width:1040px;margin:0 auto;padding:0 24px;">
+    <img src="assets/conveyor.png" alt="Inputs feed the Claude Hardware engine and finished print models roll out" style="width:100%;mix-blend-mode:multiply;">
+  </div>
+  <div data-reveal="" style="margin-top:18px;">{{ belt }}</div>
+</section>
+
+<!-- ============ DRONE EXPLODED VIEW ============ -->
+<section id="parts" data-drone-sec="" style="padding:96px 0;background:#faf9f5;overflow:hidden;">
+  <div style="max-width:1200px;margin:0 auto;padding:0 24px;">
+    <div data-reveal="" style="max-width:680px;margin:0 auto 44px;text-align:center;">
+      <div style="font-family:'Inter';font-weight:500;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#cc785c;margin-bottom:16px;">Engineered to the part</div>
+      <h2 style="font-family:'Newsreader',serif;font-weight:400;font-size:46px;line-height:1.05;letter-spacing:-1.3px;margin:0 0 14px;color:#141413;">It understands what every part does.</h2>
+      <p style="font-size:17px;line-height:1.55;color:#3d3d3a;margin:0 auto;max-width:580px;">Claude reasons about the whole machine. Geometry, tolerances, supports, and fit, all worked out before anything reaches your bed.</p>
+    </div>
+  </div>
+  <div data-reveal="" style="max-width:1120px;margin:0 auto;padding:0 24px;">
+    <div style="position:relative;border:1px solid #e6dfd8;border-radius:16px;overflow:hidden;background:#f3efe6;">
+      <div data-drone="" style="transform-origin:center center;">
+        <img src="assets/drone.png" alt="Exploded technical view of the Claude Hardware CD-A drone system" style="width:100%;">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PRINTABILITY CHECKS ============ -->
+<section style="max-width:1200px;margin:0 auto;padding:24px 24px 96px;">
+  <div data-reveal="" style="max-width:680px;margin-bottom:40px;">
+    <div style="font-family:'Inter';font-weight:500;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#cc785c;margin-bottom:16px;">Printability</div>
+    <h2 style="font-family:'Newsreader',serif;font-weight:400;font-size:44px;line-height:1.05;letter-spacing:-1.2px;margin:0 0 14px;color:#141413;">Four things beginners get wrong.<br>Claude fixes all four.</h2>
+    <p style="font-size:17px;line-height:1.55;color:#3d3d3a;margin:0;max-width:560px;">Before anything reaches your bed, Claude inspects its own model and repairs it. No slicer warnings. No failed prints.</p>
+  </div>
+  <div data-reveal-stagger="" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:18px;">{{ checks }}</div>
+</section>
+
+<!-- ============ TWO ENGINES (DARK) ============ -->
+<section id="engines" style="background:#181715;padding:96px 0;">
+  <div style="max-width:1100px;margin:0 auto;padding:0 24px;">
+    <div data-reveal="" style="display:flex;justify-content:space-between;align-items:flex-end;gap:26px;flex-wrap:wrap;margin-bottom:34px;">
+      <div style="max-width:600px;">
+        <div style="font-family:'Inter';font-weight:500;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#cc785c;margin-bottom:16px;">Two engines</div>
+        <h2 style="font-family:'Newsreader',serif;font-weight:400;font-size:44px;line-height:1.05;letter-spacing:-1.2px;margin:0 0 14px;color:#faf9f5;">Precision or organic.<br>The agent chooses.</h2>
+        <p style="font-size:17px;line-height:1.55;color:#a09d96;margin:0;">Mechanical parts go to OpenSCAD, parametric and exact. Characters and curves go to Blender, sculpted and smooth.</p>
+      </div>
+      <div style="display:flex;background:#252320;border:1px solid #34302b;border-radius:8px;padding:4px;flex:0 0 auto;">
+        <button onClick="{{ setScad }}" style="{{ scadStyle }}">OpenSCAD</button>
+        <button onClick="{{ setBlender }}" style="{{ blenderStyle }}">Blender</button>
+      </div>
+    </div>
+    <div data-reveal="">{{ engines }}</div>
+  </div>
+</section>
+
+<!-- ============ SPEAK ============ -->
+<section style="max-width:1200px;margin:0 auto;padding:96px 24px;text-align:center;">
+  <div data-reveal="">
+    <div style="display:flex;justify-content:center;margin-bottom:26px;">{{ wave }}</div>
+    <h2 style="font-family:'Newsreader',serif;font-weight:400;font-size:48px;line-height:1.04;letter-spacing:-1.4px;margin:0 0 14px;color:#141413;">Or just say it out loud.</h2>
+    <p style="font-size:17px;line-height:1.55;color:#3d3d3a;margin:0 auto;max-width:440px;">Hold the mic and describe it in plain words. Claude handles the geometry, the supports, and the file.</p>
+  </div>
+</section>
+
+<!-- ============ BRAND LOCKUP ============ -->
+<section style="background:#f5f0e8;border-top:1px solid #e6dfd8;border-bottom:1px solid #e6dfd8;padding:84px 24px;">
+  <div data-reveal="" style="max-width:760px;margin:0 auto;text-align:center;">
+    <img src="assets/logo.png" alt="Claude Hardware" style="width:260px;margin:0 auto 26px;mix-blend-mode:multiply;">
+    <p style="font-family:'Newsreader',serif;font-weight:400;font-size:30px;line-height:1.3;letter-spacing:-0.6px;color:#141413;margin:0;">The barrier to printing was never the printer.<br>It was design expertise. We supply it.</p>
+  </div>
+</section>
+
+<!-- ============ CLOSING CTA ============ -->
+<section style="max-width:1200px;margin:0 auto;padding:96px 24px;">
+  <div data-reveal="" style="background:#cc785c;border-radius:16px;padding:80px 48px;text-align:center;">
+    <h2 style="font-family:'Newsreader',serif;font-weight:400;font-size:58px;line-height:1.0;letter-spacing:-1.6px;margin:0 0 12px;color:#ffffff;">Describe anything.</h2>
+    <p style="font-size:18px;line-height:1.5;color:#fbeae3;margin:0 0 30px;">Your printer has been waiting.</p>
+    <button onClick="{{ goLogin }}" style="background:#faf9f5;border:none;border-radius:8px;padding:0 26px;height:50px;cursor:pointer;font-family:'Inter';font-weight:600;font-size:16px;color:#141413;" style-hover="background:#ffffff;">Start designing</button>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer style="background:#181715;padding:56px 24px;">
+  <div style="max-width:1200px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:9px;">
+      {{ logoGlyphDark }}
+      <span style="font-family:'Newsreader',serif;font-weight:500;font-size:17px;color:#faf9f5;">Claude</span>
+      <span style="font-family:'Inter';font-weight:500;font-size:14px;color:#a09d96;">Hardware</span>
+    </div>
+    <div style="display:flex;gap:26px;">
+      <a href="#how" style="font-family:'Inter';font-size:14px;color:#a09d96;text-decoration:none;" style-hover="color:#faf9f5;">How it works</a>
+      <a href="#parts" style="font-family:'Inter';font-size:14px;color:#a09d96;text-decoration:none;" style-hover="color:#faf9f5;">Engineering</a>
+      <a href="#engines" style="font-family:'Inter';font-size:14px;color:#a09d96;text-decoration:none;" style-hover="color:#faf9f5;">Engines</a>
+      <span onClick="{{ goLogin }}" style="font-family:'Inter';font-size:14px;color:#a09d96;cursor:pointer;" style-hover="color:#faf9f5;">Log in</span>
+    </div>
+    <div style="font-family:'Inter';font-size:13px;color:#6c6a64;">Built with Claude</div>
+  </div>
+</footer>
+
+</main>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { screen: 'landing', engine: 'openscad' };
+  reduce = (typeof window !== 'undefined') && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  setRoot = (el) => { if (el) this.rootEl = el; };
+  setNav  = (el) => { if (el) this.navEl = el; };
+  goLogin = () => { window.scrollTo(0, 0); this.setState({ screen: 'login' }); };
+  goLanding = () => this.setState({ screen: 'landing' });
+  doGoogle = () => this.setState({ screen: 'landing' });
+
+  componentDidMount() {
+    this.timers = [];
+    this.applyResponsive();
+    window.addEventListener('resize', this.applyResponsive);
+    this.setupNavScroll();
+    this.setupReveal();
+    this.waitForGsap(0);
+  }
+
+  applyResponsive = () => {
+    const root = this.rootEl; if (!root) return;
+    const w = window.innerWidth;
+    const nl = root.querySelector('[data-nav-links]'); if (nl) nl.style.display = w > 820 ? 'flex' : 'none';
+    const hero = root.querySelector('#top'); if (hero) { hero.style.gridTemplateColumns = w < 880 ? '1fr' : '1fr 1fr'; hero.style.gap = w < 880 ? '36px' : '48px'; }
+    const h1 = root.querySelector('#top h1'); if (h1) h1.style.fontSize = w < 560 ? '42px' : (w < 880 ? '54px' : '66px');
+  };
+
+  componentDidUpdate(prev) {
+    if (prev.screen !== this.state.screen && this.state.screen === 'landing') {
+      this._gsapDone = false;
+      setTimeout(() => { this.applyResponsive(); this.setupReveal(); this.waitForGsap(0); }, 40);
+    }
+  }
+
+  componentWillUnmount() {
+    (this.timers || []).forEach(t => clearTimeout(t));
+    if (this._st) this._st.forEach(t => t && t.kill && t.kill());
+    if (this._onScroll) window.removeEventListener('scroll', this._onScroll);
+    window.removeEventListener('resize', this.applyResponsive);
+  }
+
+  setupNavScroll() {
+    this._onScroll = () => {
+      const y = window.scrollY || 0;
+      if (this.navEl) this.navEl.style.borderBottomColor = y > 8 ? '#e6dfd8' : 'transparent';
+      this.checkReveal();
+    };
+    window.addEventListener('scroll', this._onScroll, { passive: true });
+    this._onScroll();
+  }
+
+  waitForGsap(tries) {
+    if (this._gsapDone) return;
+    if (window.gsap && window.ScrollTrigger) { this._gsapDone = true; this.runGsap(); return; }
+    if (tries > 120) { this.forceShow(); return; }
+    this.timers.push(setTimeout(() => this.waitForGsap(tries + 1), 50));
+  }
+
+  // Reveals are driven by our own rect check + Web Animations API, which complete on a
+  // timer (NOT on a scroll-fired trigger). Content is visible by default, so if scroll
+  // events never fire in an embedded frame, nothing is ever left hidden.
+  setupReveal() {
+    const root = this.rootEl || document;
+    this.revealEls = [...root.querySelectorAll('[data-reveal]')];
+    root.querySelectorAll('[data-reveal-stagger]').forEach(g => {
+      [...g.children].forEach((c, i) => { c.__sIndex = i; this.revealEls.push(c); });
+    });
+    if (this.reduce) { this.revealEls = []; return; }
+    this.checkReveal();
+  }
+
+  checkReveal() {
+    if (!this.revealEls || !this.revealEls.length) return;
+    const vh = window.innerHeight || 800;
+    this.revealEls = this.revealEls.filter(el => {
+      const r = el.getBoundingClientRect();
+      if (r.top < vh * 0.9 && r.bottom > -60) { this.revealEl(el); return false; }
+      return true;
+    });
+  }
+
+  revealEl(el) {
+    const delay = (el.__sIndex ? el.__sIndex * 90 : 0);
+    const bake = () => { el.style.opacity = '1'; el.style.transform = 'none'; };
+    if (el.animate) {
+      try {
+        el.animate([{ opacity: 0, transform: 'translateY(22px)' }, { opacity: 1, transform: 'translateY(0)' }],
+          { duration: 720, delay, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'both' });
+        this.timers.push(setTimeout(bake, delay + 800));
+        return;
+      } catch (e) {}
+    }
+    bake();
+  }
+
+  forceShow() {
+    const root = this.rootEl || document;
+    root.querySelectorAll('[data-reveal], [data-reveal-stagger] > *').forEach(el => { el.style.opacity = '1'; el.style.transform = 'none'; });
+  }
+
+  // GSAP is enhancement only: parallax + the drone zoom. immediateRender:false means the
+  // drone keeps its natural scale (1) until/unless its ScrollTrigger actually activates.
+  runGsap() {
+    const gsap = window.gsap, ST = window.ScrollTrigger;
+    const root = this.rootEl || document;
+    if (this.reduce) return;
+    gsap.registerPlugin(ST);
+    this._st = [];
+
+    const printer = root.querySelector('[data-printer]');
+    if (printer) {
+      const tw = gsap.to(printer, { yPercent: -9, ease: 'none',
+        scrollTrigger: { trigger: printer, start: 'top bottom', end: 'bottom top', scrub: true } });
+      if (tw.scrollTrigger) this._st.push(tw.scrollTrigger);
+    }
+
+    const drone = root.querySelector('[data-drone]');
+    const droneSec = root.querySelector('[data-drone-sec]');
+    if (drone && droneSec) {
+      const tw = gsap.fromTo(drone, { scale: 1.12 }, { scale: 1, ease: 'none', immediateRender: false,
+        scrollTrigger: { trigger: droneSec, start: 'top 80%', end: 'center center', scrub: 0.6 } });
+      if (tw.scrollTrigger) this._st.push(tw.scrollTrigger);
+    }
+  }
+
+  // ---------- brand glyph ----------
+  glyph(size, stroke, accent) {
+    const ln = (d) => React.createElement('path', { key: d, d, stroke: 'rgba(110,106,100,0.55)', strokeWidth: 0.9 });
+    return React.createElement('svg', { width: size, height: size, viewBox: '0 0 48 48', fill: 'none', stroke, strokeWidth: 1.6, strokeLinejoin: 'round' },
+      React.createElement('path', { key: 't', d: 'M24 5 L41 14 L24 23 L7 14 Z', fill: stroke === '#faf9f5' ? '#2a2724' : '#efe9de' }),
+      React.createElement('path', { key: 'l', d: 'M7 14 L24 23 L24 43 L7 34 Z', fill: stroke === '#faf9f5' ? '#211e1b' : '#e2dac9' }),
+      React.createElement('path', { key: 'r', d: 'M41 14 L24 23 L24 43 L41 34 Z', fill: stroke === '#faf9f5' ? '#2a2724' : '#efe9de' }),
+      ln('M7 19 L24 28'), ln('M7 24 L24 33'), ln('M7 29 L24 38'),
+      ln('M41 19 L24 28'), ln('M41 24 L24 33'), ln('M41 29 L24 38'),
+      React.createElement('circle', { key: 'g', cx: 24, cy: 14, r: 3, fill: accent, stroke: 'none' }));
+  }
+  logoGlyphSm() { return this.glyph(28, '#141413', '#cc785c'); }
+  logoGlyphLg() { return this.glyph(52, '#141413', '#cc785c'); }
+  logoGlyphDark() { return this.glyph(26, '#faf9f5', '#cc785c'); }
+
+  googleG() {
+    return React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 48 48' },
+      React.createElement('path', { key: 1, fill: '#EA4335', d: 'M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.3 17.6 9.5 24 9.5z' }),
+      React.createElement('path', { key: 2, fill: '#4285F4', d: 'M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.2-3.9 6.2-9.6 6.2-17z' }),
+      React.createElement('path', { key: 3, fill: '#FBBC05', d: 'M10.4 28.3c-.5-1.4-.8-2.9-.8-4.3s.3-3 .8-4.3l-7.8-6.1C1 16.7 0 20.2 0 24s1 7.3 2.6 10.4l7.8-6.1z' }),
+      React.createElement('path', { key: 4, fill: '#34A853', d: 'M24 48c6.2 0 11.5-2 15.3-5.5l-7.1-5.5c-2 1.3-4.6 2.1-8.2 2.1-6.4 0-11.7-3.8-13.6-9.8l-7.8 6.1C6.5 42.6 14.6 48 24 48z' }));
+  }
+
+  // ---------- conveyor belt marquee ----------
+  buildBelt() {
+    const chip = (t) => React.createElement('span', { key: t + Math.random(), style: { fontFamily: 'JetBrains Mono', fontSize: '12px', color: '#a9583e', background: '#f3e6df', border: '1px solid #e6cfc3', padding: '6px 14px', borderRadius: '999px', flex: '0 0 auto', letterSpacing: '0.5px' } }, t);
+    const dot = (k) => React.createElement('span', { key: 'd' + k, style: { width: '4px', height: '4px', borderRadius: '50%', background: '#cbb8a8', flex: '0 0 auto' } });
+    const set = () => ['PLA', dot(1), 'PETG', dot(2), 'TPU', dot(3), 'ABS', dot(4), 'PLA Silk', dot(5), 'Wood Fill', dot(6)].map((x, i) => typeof x === 'string' ? chip(x) : x);
+    const items = [...set(), ...set()];
+    return React.createElement('div', { style: { overflow: 'hidden', position: 'relative' } },
+      React.createElement('div', { style: { display: 'flex', gap: '20px', alignItems: 'center', width: 'max-content', padding: '4px 24px 16px', animation: this.reduce ? 'none' : 'hw-marquee 32s linear infinite' } }, items),
+      React.createElement('div', { style: { height: '12px', background: 'repeating-linear-gradient(90deg,#dcd2c3 0 2px,#e9e0d2 2px 20px)', borderTop: '1px solid #cbbfae', borderBottom: '1px solid #cbbfae', animation: this.reduce ? 'none' : 'hw-belt 1.4s linear infinite' } }));
+  }
+
+  // ---------- printability checks ----------
+  buildChecks() {
+    const data = [
+      { n: '01', t: 'Thin walls', d: 'Auto thickened to your nozzle\u2019s minimum, so nothing prints to nothing.' },
+      { n: '02', t: 'Non manifold geometry', d: 'Holes welded and the mesh made watertight, with no mystery gaps.' },
+      { n: '03', t: 'Overhangs and supports', d: 'Re oriented to print clean, with supports added only where they help.' },
+      { n: '04', t: 'Joints and clearance', d: 'Real tolerances added, so moving parts actually move and fit.' },
+    ];
+    const heal = (i) => {
+      const delay = (i * 0.3).toFixed(2) + 's';
+      const gl = (k) => React.createElement('div', { key: k, style: { height: '1.5px', width: '64%', background: '#ddd2c4', margin: '7px auto' } });
+      return React.createElement('div', { style: { position: 'relative', height: '68px', background: '#faf9f5', border: '1px solid #e6dfd8', borderRadius: '8px', overflow: 'hidden', marginBottom: '18px', padding: '8px 0' } },
+        gl(1), gl(2), gl(3),
+        React.createElement('div', { style: { position: 'absolute', left: '18%', top: '32px', width: '64%', height: '2px' } },
+          React.createElement('div', { style: { position: 'absolute', inset: 0, borderTop: '2px dashed #e8a55a', animation: this.reduce ? 'none' : 'hw-fade-x 3s ease-in-out infinite', animationDelay: delay } }),
+          React.createElement('div', { style: { position: 'absolute', left: 0, top: 0, height: '2px', background: '#cc785c', width: this.reduce ? '100%' : '0', animation: this.reduce ? 'none' : 'hw-heal 3s ease-in-out infinite', animationDelay: delay } })),
+        React.createElement('div', { style: { position: 'absolute', top: '8px', right: '8px', width: '20px', height: '20px', borderRadius: '50%', background: '#cc785c', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12px', transform: this.reduce ? 'scale(1)' : 'scale(0)', animation: this.reduce ? 'none' : 'hw-pop 3s ease-in-out infinite', animationDelay: delay } }, '\u2713'));
+    };
+    const card = (c, i) => React.createElement('div', { key: i, style: { background: '#efe9de', border: '1px solid #e6dfd8', borderRadius: '12px', padding: '22px' } },
+      heal(i),
+      React.createElement('div', { style: { fontFamily: 'JetBrains Mono', fontSize: '11px', color: '#8e8b82', marginBottom: '8px', letterSpacing: '0.5px' } }, c.n),
+      React.createElement('div', { style: { fontFamily: 'Inter', fontWeight: 600, fontSize: '17px', color: '#141413', marginBottom: '7px', letterSpacing: '-0.2px' } }, c.t),
+      React.createElement('div', { style: { fontFamily: 'Inter', fontWeight: 400, fontSize: '14px', lineHeight: '1.5', color: '#6c6a64' } }, c.d));
+    return React.createElement(React.Fragment, null, data.map(card));
+  }
+
+  // ---------- engines (dark) ----------
+  wire(kind) {
+    const stroke = '#a09d96';
+    if (kind === 'scad') {
+      const teeth = [];
+      for (let i = 0; i < 12; i++) { const a = i * 30 * Math.PI / 180; const x = 60 + Math.cos(a) * 50, y = 60 + Math.sin(a) * 50; teeth.push(React.createElement('rect', { key: i, x: x - 4, y: y - 4, width: 8, height: 8, fill: 'none', stroke, strokeWidth: 1.4, transform: 'rotate(' + (i * 30) + ' ' + x + ' ' + y + ')' })); }
+      return React.createElement('svg', { width: 120, height: 120, viewBox: '0 0 120 120', style: { animation: this.reduce ? 'none' : 'hw-spin 22s linear infinite' } },
+        React.createElement('circle', { cx: 60, cy: 60, r: 44, fill: 'none', stroke, strokeWidth: 1.4 }),
+        React.createElement('circle', { cx: 60, cy: 60, r: 14, fill: 'none', stroke, strokeWidth: 1.4 }),
+        React.createElement('circle', { cx: 60, cy: 60, r: 50, fill: 'none', stroke: '#cc785c', strokeWidth: 1.2, strokeDasharray: '3 5' }),
+        ...teeth);
+    }
+    return React.createElement('svg', { width: 120, height: 120, viewBox: '0 0 120 120', style: { animation: this.reduce ? 'none' : 'hw-spin 26s linear infinite' } },
+      React.createElement('circle', { cx: 60, cy: 60, r: 46, fill: 'none', stroke, strokeWidth: 1.3 }),
+      React.createElement('ellipse', { cx: 60, cy: 60, rx: 46, ry: 18, fill: 'none', stroke, strokeWidth: 1.1 }),
+      React.createElement('ellipse', { cx: 60, cy: 60, rx: 18, ry: 46, fill: 'none', stroke, strokeWidth: 1.1 }),
+      React.createElement('ellipse', { cx: 60, cy: 60, rx: 34, ry: 34, fill: 'none', stroke: '#cc785c', strokeWidth: 1, strokeDasharray: '2 6' }),
+      React.createElement('path', { d: 'M14 60 Q60 40 106 60', fill: 'none', stroke, strokeWidth: 1.1 }),
+      React.createElement('path', { d: 'M14 60 Q60 80 106 60', fill: 'none', stroke, strokeWidth: 1.1 }));
+  }
+
+  codeWindow(lines, title) {
+    const rows = lines.map((l, i) => React.createElement('div', { key: i, style: { display: 'flex', gap: '16px' } },
+      React.createElement('span', { style: { color: '#56524c', userSelect: 'none', width: '16px', textAlign: 'right', flex: '0 0 auto' } }, i + 1),
+      React.createElement('span', { style: { whiteSpace: 'pre', color: l.c || '#cfcabf' } }, l.t)));
+    return React.createElement('div', { style: { background: '#1f1e1b', border: '1px solid #34302b', borderRadius: '10px', overflow: 'hidden' } },
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '7px', padding: '11px 14px', borderBottom: '1px solid #2c2925' } },
+        React.createElement('span', { style: { width: '9px', height: '9px', borderRadius: '50%', background: '#3a352f' } }),
+        React.createElement('span', { style: { width: '9px', height: '9px', borderRadius: '50%', background: '#3a352f' } }),
+        React.createElement('span', { style: { width: '9px', height: '9px', borderRadius: '50%', background: '#3a352f' } }),
+        React.createElement('span', { style: { fontFamily: 'JetBrains Mono', fontSize: '11px', color: '#6c6a64', marginLeft: '6px' } }, title)),
+      React.createElement('div', { style: { padding: '16px', fontFamily: 'JetBrains Mono', fontSize: '12.5px', lineHeight: '1.85' } }, rows));
+  }
+
+  buildEngines() {
+    const eng = this.state.engine;
+    const scadCode = [
+      { t: 'module knob() {', c: '#cc9f8c' },
+      { t: '  cylinder(d=24, h=12, $fn=64);' },
+      { t: '  for (a = [0:30:330])' },
+      { t: '    rotate(a) translate([11,0,0])' },
+      { t: '      cylinder(d=3, h=12);', c: '#9fb89a' },
+      { t: '}' },
+      { t: 'knob();  // parametric, exact', c: '#6c6a64' },
+    ];
+    const blenderCode = [
+      { t: 'import bpy', c: '#cc9f8c' },
+      { t: 'bpy.ops.mesh.primitive_uv_sphere_add()' },
+      { t: 'obj = bpy.context.active_object' },
+      { t: 'mod = obj.modifiers.new("S","SUBSURF")' },
+      { t: 'mod.levels = 3', c: '#9fb89a' },
+      { t: 'bpy.ops.object.shade_smooth()' },
+      { t: '# organic, sculpted', c: '#6c6a64' },
+    ];
+    const panel = (active, code, title, wireKind, tag) => React.createElement('div', { style: { position: 'absolute', inset: 0, opacity: active ? 1 : 0, transform: active ? 'translateY(0)' : 'translateY(10px)', transition: this.reduce ? 'none' : 'opacity .45s ease, transform .45s ease', pointerEvents: active ? 'auto' : 'none', display: 'grid', gridTemplateColumns: '1.15fr 0.85fr', gap: '20px', alignItems: 'stretch' } },
+      this.codeWindow(code, title),
+      React.createElement('div', { style: { background: '#1f1e1b', border: '1px solid #34302b', borderRadius: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', padding: '20px' } },
+        this.wire(wireKind),
+        React.createElement('div', { style: { fontFamily: 'JetBrains Mono', fontSize: '11px', color: '#a09d96', letterSpacing: '0.5px' } }, tag)));
+    return React.createElement('div', { style: { position: 'relative', minHeight: '276px' } },
+      panel(eng === 'openscad', scadCode, 'knob.scad', 'scad', 'parametric / precise'),
+      panel(eng === 'blender', blenderCode, 'figure.py', 'blender', 'organic / smooth'));
+  }
+
+  // ---------- voice waveform ----------
+  buildWave() {
+    const bars = [];
+    for (let i = 0; i < 52; i++) {
+      const h = 10 + 44 * Math.pow(Math.sin(i / 51 * Math.PI), 0.65);
+      bars.push(React.createElement('div', { key: i, style: { width: '4px', height: h.toFixed(0) + 'px', borderRadius: '2px', background: '#cc785c', transformOrigin: 'center', animation: this.reduce ? 'none' : 'hw-wave ' + (0.7 + (i % 6) * 0.12).toFixed(2) + 's ease-in-out infinite', animationDelay: (-(i * 0.04)).toFixed(2) + 's' } }));
+    }
+    return React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '3px', height: '70px' } }, bars);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const tabBase = { padding: '8px 18px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontFamily: 'Inter', fontWeight: 500, fontSize: '14px' };
+    return {
+      isLanding: s.screen === 'landing',
+      isLogin: s.screen === 'login',
+      goLogin: this.goLogin,
+      goLanding: this.goLanding,
+      doGoogle: this.doGoogle,
+      setRoot: this.setRoot,
+      setNav: this.setNav,
+      logoGlyphSm: this.logoGlyphSm(),
+      logoGlyphLg: this.logoGlyphLg(),
+      logoGlyphDark: this.logoGlyphDark(),
+      googleG: this.googleG(),
+      belt: this.buildBelt(),
+      checks: this.buildChecks(),
+      engines: this.buildEngines(),
+      wave: this.buildWave(),
+      setScad: () => this.setState({ engine: 'openscad' }),
+      setBlender: () => this.setState({ engine: 'blender' }),
+      scadStyle: { ...tabBase, background: s.engine === 'openscad' ? '#cc785c' : 'transparent', color: s.engine === 'openscad' ? '#fff' : '#a09d96' },
+      blenderStyle: { ...tabBase, background: s.engine === 'blender' ? '#cc785c' : 'transparent', color: s.engine === 'blender' ? '#fff' : '#a09d96' },
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+# env / secrets
+.env
+.env.local
+*.local
+
+# node
+node_modules/
+.next/
+out/
+dist/
+npm-debug.log*
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# generated artifacts (keep curated fixtures only)
+tools/_scratch/
+tools/_watch/
+public/generated/
+*.gcode
+*.stl
+!demo-fixtures/**
+
+# os / editor
+.DS_Store
+.vscode/
+
+# playwright verification artifacts (screenshots, snapshots, console logs)
+.playwright-mcp/
+hero-*.png
+
+# served demo fixtures (tracked despite *.stl rule above)
+!public/fixtures/*.stl
+
+# typescript build info
+*.tsbuildinfo
+
+# next.js generated (regenerated on build/dev)
+next-env.d.ts
+
+# InsForge & AI agent skills
+.insforge
+.agent
+.agents
+.augment
+.claude
+.cline
+.github/copilot*
+.kilocode
+.qoder
+.qwen
+.roo
+.trae
+.windsurf
+
+# BOSL2 OpenSCAD library (cloned via setup, not vendored)
+tools/openscad-libs/
+
+# markdown docs are local context only — never committed (must stay LAST so it
+# overrides the !demo-fixtures/** re-include above)
+*.md

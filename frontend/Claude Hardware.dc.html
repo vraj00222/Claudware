@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#E4DED2;font-family:'Space Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+  @keyframes hwblink{0%,48%{opacity:1}49%,100%{opacity:0}}
+  @keyframes hwsettle{0%{transform:scale(.975)}55%{transform:scale(1.012)}100%{transform:scale(1)}}
+  @keyframes hwfeedin{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  @keyframes hwlayerfill{from{background-position:0 0}to{background-position:0 -6px}}
+  @keyframes hwripple{0%{transform:scale(1);opacity:.5}100%{transform:scale(1.9);opacity:0}}
+  @keyframes hwwave{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+  @keyframes hwpulsedot{0%,100%{opacity:1}50%{opacity:.35}}
+  ::-webkit-scrollbar{width:7px;height:7px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:#C9C3B6;border-radius:4px}
+</style>
+</helmet>
+
+<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#E4DED2;">
+<div ref="{{ scalerRef }}" data-screen-label="Claude Hardware Studio" style="width:1440px;height:884px;flex:none;transform-origin:center center;background:#FBFAF6;border:1px solid #DCD7CC;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;position:relative;font-family:'Space Grotesk',system-ui,sans-serif;color:#232019;">
+
+  <!-- ===== TOP BAR ===== -->
+  <div style="height:54px;flex:none;display:flex;align-items:center;gap:20px;padding:0 18px;border-bottom:1px solid #DCD7CC;background:#FBFAF6;z-index:6;">
+    <div style="display:flex;align-items:center;gap:10px;flex:none;">
+      <div style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:#00A44A;font-size:17px;line-height:1;">⬡</div>
+      <span style="font-size:13.5px;font-weight:600;letter-spacing:.05em;color:#232019;">CLAUDE HARDWARE</span>
+    </div>
+    <div style="flex:1;display:flex;justify-content:center;align-items:center;">
+      <sc-for list="{{ stages }}" as="stage" hint-placeholder-count="5">
+        <div style="display:flex;align-items:center;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="{{ stage.boxStyle }}">{{ stage.boxText }}</div>
+            <span style="{{ stage.labelStyle }}">{{ stage.name }}</span>
+          </div>
+          <sc-if value="{{ stage.notLast }}" hint-placeholder-val="{{ true }}">
+            <div style="width:26px;height:1px;background:#C9C3B6;margin:0 12px;"></div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+    <div style="flex:none;display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#6E6A60;">
+      <span style="width:6px;height:6px;border-radius:50%;background:#00A44A;animation:hwpulsedot 2.4s ease-in-out infinite;"></span>
+      <span>{{ printerStatusTop }}</span>
+    </div>
+  </div>
+
+  <!-- ===== MAIN 3-PANEL ===== -->
+  <div style="flex:1;display:flex;min-height:0;">
+
+    <!-- LEFT: CONVERSATION -->
+    <div style="width:300px;flex:none;border-right:1px solid #DCD7CC;background:#FBFAF6;display:flex;flex-direction:column;min-height:0;">
+      <div style="padding:14px 16px 8px;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.14em;color:#A6A095;flex:none;">CONVERSATION</div>
+      <div style="flex:1;overflow-y:auto;padding:4px 16px 12px;display:flex;flex-direction:column;gap:14px;min-height:0;">
+        <sc-if value="{{ showConvo }}" hint-placeholder-val="{{ true }}">
+          <div style="align-self:flex-end;max-width:240px;background:#DCD7CC;border:1px solid #C9C3B6;border-radius:14px 14px 4px 14px;padding:10px 13px;font-size:14px;line-height:20px;font-weight:400;color:#232019;">A phone stand with a 15° viewing angle and a cable slot</div>
+          <div style="display:flex;flex-direction:column;gap:9px;align-self:flex-start;max-width:248px;">
+            <div style="font-size:14px;line-height:20px;font-weight:400;color:#6E6A60;">Designing now — I'll flag anything that affects printability.</div>
+            <div style="position:relative;align-self:flex-start;">
+              <div onClick="{{ toggleMode }}" style="display:inline-flex;align-items:center;gap:7px;background:#F0ECE3;border:1px solid #C9C3B6;border-radius:9999px;padding:5px 11px 5px 9px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#232019;user-select:none;">
+                <span style="color:#1F8F50;">{{ modeIcon }}</span><span>{{ modeLabel }}</span>
+                <span style="color:#A6A095;font-size:9px;">▾</span>
+              </div>
+              <sc-if value="{{ showModePopover }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;top:34px;left:0;width:188px;background:#F0ECE3;border:1px solid #C9C3B6;border-radius:10px;padding:5px;z-index:20;display:flex;flex-direction:column;gap:2px;">
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:#A6A095;padding:5px 8px 3px;">RE-ROUTE ENGINE</div>
+                  <sc-for list="{{ modeOptions }}" as="opt" hint-placeholder-count="3">
+                    <div onClick="{{ opt.pick }}" style="{{ opt.rowStyle }}"><span style="width:16px;display:inline-block;color:#1F8F50;">{{ opt.icon }}</span><span style="flex:1;">{{ opt.name }}</span><span style="color:#00A44A;">{{ opt.check }}</span></div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <!-- input -->
+      <div style="flex:none;border-top:1px solid #DCD7CC;padding:12px 14px 14px;">
+        <sc-if value="{{ showRefImage }}" hint-placeholder-val="{{ true }}">
+          <div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:10px;padding:5px 7px;border:1px solid #00A44A;border-radius:8px;background:#E7F0E9;">
+            <div style="width:30px;height:30px;border-radius:5px;background:repeating-linear-gradient(135deg,#DCD7CC 0 5px,#E2DCD0 5px 10px);flex:none;"></div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#6E6A60;">ref_pose.png</span>
+            <span onClick="{{ removeRef }}" style="color:#A6A095;cursor:pointer;font-size:13px;padding:0 2px;">✕</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ micActive }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:flex-end;gap:3px;height:22px;margin-bottom:9px;padding:0 4px;">
+            <sc-for list="{{ waveBars }}" as="bar" hint-placeholder-count="22">
+              <div style="{{ bar.style }}"></div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <div style="display:flex;align-items:center;gap:9px;background:#F0ECE3;border:1px solid #C9C3B6;border-radius:9999px;padding:6px 7px 6px 6px;">
+          <div onClick="{{ toggleMic }}" style="{{ micBtnStyle }}">●</div>
+          <span style="flex:1;font-size:13px;color:#A6A095;font-weight:300;">{{ inputPlaceholder }}</span>
+          <span style="color:#A6A095;font-size:14px;cursor:pointer;padding-right:4px;">📎</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER: VIEWPORT -->
+    <div style="flex:1;display:flex;flex-direction:column;min-width:0;background:#ECE7DC;">
+      <div ref="{{ viewportRef }}" style="flex:1;position:relative;min-height:0;overflow:hidden;">
+        <canvas ref="{{ canvasRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block;"></canvas>
+
+        <!-- BOOT overlay -->
+        <sc-if value="{{ showBoot }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ skipBoot }}" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:13px;cursor:pointer;z-index:4;">
+            <sc-for list="{{ bootRows }}" as="line" hint-placeholder-count="3">
+              <div style="{{ line.style }}">{{ line.text }}<span style="{{ line.cursorStyle }}">▍</span></div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- EMPTY overlay -->
+        <sc-if value="{{ showEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:3;">
+            <div style="font-size:18px;font-weight:500;color:#6E6A60;">Describe an object to begin</div>
+            <div style="display:flex;gap:10px;">
+              <sc-for list="{{ exampleChips }}" as="chip" hint-placeholder-count="3">
+                <div style="background:#F0ECE3;border:1px solid #C9C3B6;border-radius:9999px;padding:7px 14px;font-size:12.5px;color:#232019;cursor:pointer;">{{ chip }}</div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- dimension callouts -->
+        <sc-if value="{{ showDims }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;pointer-events:none;z-index:2;">
+            <sc-for list="{{ dims }}" as="d" hint-placeholder-count="3">
+              <div style="{{ d.style }}">{{ d.text }}</div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- printer loader corner -->
+        <sc-if value="{{ showPrinter }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:18px;bottom:16px;z-index:3;display:flex;flex-direction:column;gap:5px;">
+            <pre style="margin:0;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:13px;color:#00A44A;letter-spacing:0;">{{ printerArt }}</pre>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#A6A095;">{{ printerStatusLine }}<span style="animation:hwblink 1s steps(1) infinite;">▍</span></div>
+          </div>
+        </sc-if>
+
+        <!-- studio badge -->
+        <sc-if value="{{ showStudioBadge }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:18px;top:16px;z-index:3;font-family:'JetBrains Mono',monospace;font-size:11px;color:#1F8F50;border:1px solid #BBDFC8;background:#E6F1EA;border-radius:7px;padding:6px 10px;">{{ studioStatus }}</div>
+        </sc-if>
+
+        <!-- inspect feed leader anchor label -->
+        <sc-if value="{{ showInspectLabel }}" hint-placeholder-val="{{ false }}">
+          <div style="{{ inspectLabelStyle }}">{{ inspectLabelText }}</div>
+        </sc-if>
+      </div>
+
+      <!-- VERSION RAIL -->
+      <div style="flex:none;height:74px;border-top:1px solid #DCD7CC;background:#FBFAF6;display:flex;align-items:center;gap:12px;padding:0 18px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:#A6A095;margin-right:2px;">VERSIONS</span>
+        <sc-for list="{{ versions }}" as="v" hint-placeholder-count="3">
+          <div onClick="{{ v.pick }}" style="{{ v.boxStyle }}">
+            <span style="{{ v.labelStyle }}">{{ v.label }}</span>
+            <sc-if value="{{ v.warn }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:5px;right:5px;width:5px;height:5px;border-radius:50%;background:#B26B07;"></span></sc-if>
+          </div>
+        </sc-for>
+        <div style="width:46px;height:46px;border:1px dashed #C9C3B6;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#A6A095;font-size:18px;cursor:pointer;">+</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: AGENT WORK -->
+    <div style="width:340px;flex:none;border-left:1px solid #DCD7CC;background:#FBFAF6;display:flex;flex-direction:column;min-height:0;">
+
+      <!-- FEED -->
+      <div style="flex:1;display:flex;flex-direction:column;min-height:0;border-bottom:1px solid #DCD7CC;">
+        <div style="flex:none;display:flex;align-items:center;justify-content:space-between;padding:13px 16px 9px;">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.14em;color:#A6A095;">AGENT ACTIVITY</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#1F8F50;display:flex;align-items:center;gap:6px;"><span style="width:5px;height:5px;border-radius:50%;background:#00A44A;animation:hwpulsedot 1.6s ease-in-out infinite;"></span>{{ feedMode }}</span>
+        </div>
+        <div ref="{{ feedRef }}" style="flex:1;overflow-y:auto;padding:0 14px 12px;">
+          <sc-for list="{{ rows }}" as="row" hint-placeholder-count="8">
+            <div style="{{ row.rowStyle }}">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#A6A095;width:34px;flex:none;">{{ row.time }}</span>
+              <span style="{{ row.glyphStyle }}">{{ row.glyph }}</span>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:#232019;">{{ row.label }}</span>
+                  <sc-if value="{{ row.showBar }}" hint-placeholder-val="{{ false }}"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#00A44A;letter-spacing:1px;">{{ row.bar }}</span></sc-if>
+                </div>
+                <span style="{{ row.detailStyle }}">{{ row.detail }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- DESIGN NOTES -->
+      <div style="flex:none;padding:13px 16px;border-bottom:1px solid #DCD7CC;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.14em;color:#A6A095;margin-bottom:11px;">DESIGN NOTES</div>
+        <div style="display:flex;flex-direction:column;gap:9px;">
+          <sc-for list="{{ notes }}" as="n" hint-placeholder-count="4">
+            <div style="display:flex;align-items:flex-start;gap:9px;">
+              <span style="{{ n.glyphStyle }}">{{ n.glyph }}</span>
+              <span style="flex:1;font-size:13px;line-height:18px;color:#6E6A60;font-weight:400;">{{ n.text }}</span>
+              <sc-if value="{{ n.action }}" hint-placeholder-val="{{ false }}"><span onClick="{{ applyFix }}" style="flex:none;font-size:11.5px;font-weight:500;color:#232019;border:1px solid #C9C3B6;border-radius:7px;padding:3px 9px;cursor:pointer;">Apply fix</span></sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- PRINT CENTER -->
+      <div style="flex:none;padding:14px 16px 16px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.14em;color:#A6A095;margin-bottom:11px;">PRINT CENTER</div>
+        <sc-if value="{{ isPrinting }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:11px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:11.5px;">
+              <span style="color:#232019;">{{ printJob }}</span><span style="color:#1F8F50;">{{ printEta }}</span>
+            </div>
+            <div style="height:6px;background:#F0ECE3;border-radius:3px;overflow:hidden;"><div style="{{ printBarStyle }}"></div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6E6A60;">{{ printLayerText }}<span style="animation:hwblink 1s steps(1) infinite;">▍</span></div>
+            <div style="margin-top:3px;aspect-ratio:16/9;border:1px solid #DCD7CC;border-radius:8px;background:#E4DED2;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#A6A095;letter-spacing:.1em;">◉ printer cam</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isReady }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:13px;">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#6E6A60;">14g PLA · 1h 23m · 847 layers</div>
+            <div onClick="{{ sendPrint }}" style="position:relative;background:#00A44A;border-radius:9999px;height:42px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#06120B;cursor:pointer;overflow:hidden;">
+              <span style="position:relative;z-index:2;">Send to printer</span>
+              <span style="{{ rippleStyle }}"></span>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== DEMO HARNESS FOOTER ===== -->
+  <div style="flex:none;height:46px;display:flex;align-items:center;gap:12px;padding:0 18px;border-top:1px solid #DCD7CC;background:#FBFAF6;z-index:6;">
+    <span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.18em;color:#A6A095;flex:none;">DEMO&nbsp;HARNESS</span>
+    <div style="width:1px;height:15px;background:#DCD7CC;flex:none;"></div>
+    <div style="flex:1;display:flex;align-items:center;gap:1px;overflow-x:auto;min-width:0;">
+      <sc-for list="{{ conductor }}" as="c" hint-placeholder-count="8">
+        <div onClick="{{ c.go }}" style="{{ c.style }}">{{ c.label }}</div>
+      </sc-for>
+    </div>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.06em;color:#A6A095;flex:none;">auto-plays once · replay any moment</span>
+  </div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = { phase:'boot', fv:'parametric', fc:0, micActive:false, modePopover:false,
+            isPrinting:false, mode:'parametric', curVersion:2, showConvo:false, rippleKey:0 };
+
+  // ---- instance (non-react) animation + data ----
+  canvasRef = React.createRef();
+  viewportRef = React.createRef();
+  feedRef = React.createRef();
+  scalerRef = React.createRef();
+
+  C = { canvas:'#E4DED2', surf:'#FBFAF6', inset:'#F0ECE3', border:'#C9C3B6', bsub:'#DCD7CC',
+        text:'#232019', t2:'#6E6A60', faint:'#A6A095', accent:'#00A44A', aweak:'#1F8F50',
+        warn:'#B26B07', error:'#C0271A', objFill:'#E6E1D6', objBack:'#D6CFC2', layer:'#B9B2A4' };
+
+  a = { form:1, rotate:0, dim:0, scan:0, scanOn:0, marker:0, markerCol:'amber', markerDis:0,
+        explode:0, obj:'stand', settle:0, printLayer:12, mini:0, printerIdx:0 };
+
+  boot = { line:0, l3cursor:true };
+  mini = 0;
+
+  PRINTER = [
+"┌─▼━━━━━━━━┐\n│ ▓░       │\n│ ████████ │\n│ ████████ │\n╘═◉══════◉╛",
+"┌━━━▼━━━━━━┐\n│ ▓▓▓▓░    │\n│ ████████ │\n│ ████████ │\n╘═◉══════◉╛",
+"┌━━━━━━━▼━━┐\n│ ▓▓▓▓▓▓▓░ │\n│ ████████ │\n│ ████████ │\n╘═◉══════◉╛",
+"┌─▼━━━━━━━━┐\n│ ░        │\n│ ████████ │\n│ ████████ │\n╘═◉══════◉╛" ];
+
+  feedData(v){
+    if(v==='figure') return [
+      ['00:01','◆','plan','figure from reference · est. 38mm tall','plan',null],
+      ['00:04','●','generate_mesh','image → mesh','active',null],
+      ['00:52','✓','generate_mesh','142k tris · watertight','ok',null],
+      ['00:55','✓','repair_mesh','decimated 80k · manifold ok','ok',null],
+      ['00:58','◆','add_joints','shoulders · ball sockets Ø6mm','plan',null],
+      ['01:03','⚠','inspect_render','left socket wall 0.9mm — too thin','warn','a'],
+      ['01:04','◆','fix','socket offset +0.4mm, re-cutting','fix','b'],
+      ['01:07','✓','validate','printable · supports: arms only','ok','c'] ];
+    return [
+      ['00:01','◆','plan','base plate → 15° riser → cable slot','plan',null],
+      ['00:03','✓','write_scad','phone_stand.scad · 42 lines','ok',null],
+      ['00:06','✓','render_preview','4 angles · 1.2s','ok',null],
+      ['00:08','⚠','inspect_render','cable slot intersects riser wall','warn','a'],
+      ['00:09','◆','fix','shifting slot 4mm left, re-rendering','fix','b'],
+      ['00:11','✓','render_preview','clean','ok','c'],
+      ['00:13','✓','validate','printable · no supports needed','ok',null],
+      ['00:14','●','slice','847 layers · 0.2mm','active',null] ];
+  }
+
+  // ===================== lifecycle =====================
+  fit(){ const s=this.scalerRef.current; if(!s) return; const sc=Math.min(window.innerWidth/1440, window.innerHeight/884); s.style.transform='scale('+Math.min(1,sc)+')'; }
+  componentDidMount(){
+    this._alive = true; this._last = performance.now();
+    this.fit(); this._onR=()=>{ this.fit(); this.resize(); }; window.addEventListener('resize',this._onR);
+    this.resize(); this._ro = new ResizeObserver(()=>this.resize());
+    if(this.viewportRef.current) this._ro.observe(this.viewportRef.current);
+    this._raf = requestAnimationFrame(this.loop);
+    this._mini = setInterval(()=>{ this.a.printerIdx=(this.a.printerIdx+1)%4; this.mini=(this.mini+1)%4; if(this.state.phase==='forming'||this.state.isPrinting||this.hasActiveRow()) this.forceUpdate(); if(document.hidden){ try{ this.draw(); }catch(e){} } }, 180);
+    this.runDemo();
+  }
+  componentWillUnmount(){ this._alive=false; cancelAnimationFrame(this._raf); clearInterval(this._mini); if(this._ro)this._ro.disconnect(); window.removeEventListener('resize',this._onR); this._timers&&this._timers.forEach(clearTimeout); }
+
+  hasActiveRow(){ const d=this.feedData(this.state.fv).slice(0,this.state.fc); return d.some(r=>r[4]==='active'); }
+  sleep(ms){ return new Promise(r=>{ const t=setTimeout(r,ms); (this._timers=this._timers||[]).push(t); }); }
+  set(p){ return new Promise(res=>this.setState(p,res)); }
+
+  resize(){
+    const c=this.canvasRef.current, host=this.viewportRef.current; if(!c||!host) return;
+    const w=host.clientWidth, h=host.clientHeight; const dpr=Math.min(2,window.devicePixelRatio||1);
+    this.cw=w; this.ch=h; c.width=w*dpr; c.height=h*dpr;
+    const ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  // ===================== tween helper =====================
+  tween(key, to, dur, delay){ (this._tw=this._tw||[]).push({key,from:this.a[key],to,dur,t:-(delay||0)}); }
+  updTweens(dt){ if(!this._tw) return; for(const w of this._tw){ w.t+=dt; if(w.t<0) continue; const p=Math.min(1,w.t/w.dur); const e=1-Math.pow(1-p,3); this.a[w.key]=w.from+(w.to-w.from)*e; } this._tw=this._tw.filter(w=>w.t<w.dur); }
+
+  loop = (ts)=>{ if(!this._alive) return; const dt=Math.min(48,ts-this._last); this._last=ts;
+    try {
+      this.updTweens(dt);
+      if(this.state.phase==='complete'||this.state.phase==='studio') this.a.rotate+=dt*0.00020;
+      if(this.a.markerDisTarget) this.a.markerDis=Math.min(1,this.a.markerDis+dt/600);
+      this.draw();
+    } catch(e){ if(!this._logged){ console.error('loop',e); this._logged=true; } }
+    this._raf=requestAnimationFrame(this.loop); };
+
+  // ===================== canvas draw =====================
+  draw(){ const c=this.canvasRef.current; if(!c) return; const ctx=c.getContext('2d');
+    let W=this.cw,H=this.ch;
+    if(!W && c.width){ const dpr=Math.min(2,window.devicePixelRatio||1); W=this.cw=c.width/dpr; H=this.ch=c.height/dpr; ctx.setTransform(dpr,0,0,dpr,0,0); }
+    if(!W) return;
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#ECE7DC'; ctx.fillRect(0,0,W,H);
+    this.drawGrid(ctx,W,H); this.drawAxis(ctx,W,H);
+    const ph=this.state.phase;
+    if(ph!=='boot'&&ph!=='empty'){ if(this.a.obj==='figure') this.drawFigure(ctx,W,H); else this.drawStand(ctx,W,H); }
+    else if(ph==='empty'||ph==='boot'){ this.drawGhostCube(ctx,W,H, ph==='boot'? this.bootCube:1); }
+    if(this.a.dim>0){ ctx.fillStyle='rgba(244,241,233,'+this.a.dim+')'; ctx.fillRect(0,0,W,H); }
+    if(this.a.scanOn>0) this.drawReticle(ctx,W,H);
+  }
+
+  drawGrid(ctx,W,H){ ctx.save(); ctx.strokeStyle='rgba(35,32,25,0.05)'; ctx.lineWidth=1;
+    const hY=H*0.82, vp={x:W*0.5,y:H*0.30}; // floor lines receding
+    for(let i=0;i<7;i++){ const t=i/6; const y=hY+(H-hY)*t*0.9; ctx.globalAlpha=1-t*0.7; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    ctx.globalAlpha=1; for(let i=-6;i<=6;i++){ const x=W*0.5+i*(W*0.5/6); ctx.beginPath(); ctx.moveTo(x,hY); ctx.lineTo(vp.x+(x-vp.x)*0.35,hY-H*0.16); ctx.stroke(); }
+    ctx.restore(); }
+
+  drawAxis(ctx,W,H){ ctx.save(); const ox=34,oy=H-30,L=18; ctx.lineWidth=1.2; ctx.font="9px 'JetBrains Mono',monospace";
+    ctx.strokeStyle='rgba(35,32,25,.34)'; ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ox+L,oy-4); ctx.stroke(); ctx.fillStyle='rgba(35,32,25,.38)'; ctx.fillText('x',ox+L+2,oy-3);
+    ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ox-7,oy-L+2); ctx.stroke(); ctx.fillText('z',ox-13,oy-L+2);
+    ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ox+8,oy-L); ctx.stroke(); ctx.fillText('y',ox+9,oy-L);
+    ctx.restore(); }
+
+  drawGhostCube(ctx,W,H,prog){ ctx.save(); const cx=W*0.5,cy=H*0.5,s=86,d=44; ctx.strokeStyle='rgba(120,113,99,.5)'; ctx.lineWidth=1.2;
+    const fr=[[-s,-s],[s,-s],[s,s],[-s,s]].map(p=>[cx+p[0],cy+p[1]]);
+    const bk=fr.map(p=>[p[0]+d,p[1]-d]);
+    // reveal bottom-up by prog
+    ctx.beginPath(); for(let i=0;i<4;i++){ const a=fr[i],b=fr[(i+1)%4]; ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+    for(let i=0;i<4;i++){ const a=bk[i],b=bk[(i+1)%4]; ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+    for(let i=0;i<4;i++){ ctx.moveTo(fr[i][0],fr[i][1]); ctx.lineTo(bk[i][0],bk[i][1]); }
+    ctx.globalAlpha=0.5*prog; ctx.stroke(); ctx.restore(); }
+
+  // phone stand local polygons (y up, origin base-center)
+  standPolys(){
+    const base=[[-92,0],[92,0],[92,22],[-92,22]];
+    const lip=[[58,22],[92,22],[92,30],[72,48],[58,48]];
+    const riser=[[-92,22],[-50,22],[-2,200],[-44,200]];
+    return [base,lip,riser];
+  }
+  drawStand(ctx,W,H){ const polys=this.standPolys();
+    const objH=200, scale=Math.min(W*0.5/200, H*0.62/objH); const baseY=H*0.80, cx=W*0.5;
+    const depth=24; const dx=depth*Math.cos(this.a.rotate)*0.7, dy=-depth*0.42;
+    const L=(x,y,ox,oy)=>[cx+x*scale+(ox||0), baseY-y*scale+(oy||0)];
+    const trace=(off)=>{ ctx.beginPath(); for(const poly of polys){ poly.forEach((p,i)=>{ const s=L(p[0],p[1],off?dx:0,off?dy:0); i?ctx.lineTo(s[0],s[1]):ctx.moveTo(s[0],s[1]); }); ctx.closePath(); } };
+    // back face
+    ctx.save(); trace(true); ctx.fillStyle=this.C.objBack; ctx.fill(); ctx.restore();
+    // connecting struts (silhouette extrude) — simple edge lines
+    ctx.save(); ctx.strokeStyle='rgba(150,142,127,.85)'; ctx.lineWidth=1;
+    for(const poly of polys){ for(const p of poly){ const f=L(p[0],p[1],0,0), b=L(p[0],p[1],dx,dy); ctx.beginPath(); ctx.moveTo(f[0],f[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); } }
+    ctx.restore();
+    // front face fill + layer lines (clip), revealed by form
+    const formY = baseY - this.a.form*objH*scale;
+    ctx.save(); trace(false); ctx.clip();
+    ctx.beginPath(); ctx.rect(0,formY,W,H); ctx.clip();
+    ctx.fillStyle=this.C.objFill; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle=this.C.layer; ctx.lineWidth=1;
+    const topY=baseY-objH*scale-4;
+    for(let y=baseY; y>topY; y-=3){ ctx.globalAlpha=(Math.round((baseY-y)/3)%4===0)?0.85:0.4; ctx.beginPath(); ctx.moveTo(0,y+0.5); ctx.lineTo(W,y+0.5); ctx.stroke(); }
+    ctx.globalAlpha=1; ctx.restore();
+    // outline
+    ctx.save(); ctx.strokeStyle='rgba(35,32,25,.62)'; ctx.lineWidth=1.3; trace(false); ctx.stroke(); ctx.restore();
+    // cable slot hole on riser
+    const slot=L(-46,118,0,0); ctx.save(); ctx.beginPath(); ctx.ellipse(slot[0],slot[1],5*scale,9*scale,0.12,0,7); ctx.fillStyle='#ECE7DC'; ctx.fill(); ctx.strokeStyle='rgba(35,32,25,.45)'; ctx.lineWidth=1; ctx.stroke(); ctx.restore();
+    // forming scanline
+    if(this.a.form<1){ ctx.save(); ctx.strokeStyle=this.C.accent; ctx.lineWidth=1.4; ctx.shadowColor=this.C.accent; ctx.shadowBlur=8; ctx.beginPath(); ctx.moveTo(W*0.18,formY); ctx.lineTo(W*0.82,formY); ctx.stroke(); ctx.restore(); }
+    this._slotScreen=slot;
+  }
+
+  drawFigure(ctx,W,H){ const scale=Math.min(W,H)/420; const cx=W*0.5, cy=H*0.46; const e=this.a.explode;
+    const seam=this.a.settle; // 0..1 pulse green
+    const part=(x,y,w,h, ex,ey)=>{ ctx.save(); const px=cx+x*scale+ex*e*scale, py=cy+y*scale+ey*e*scale;
+      ctx.beginPath(); const r=Math.min(w,h)*scale*0.4; this.rr(ctx,px-w*scale/2,py-h*scale/2,w*scale,h*scale,r);
+      ctx.fillStyle=this.C.objFill; ctx.fill(); ctx.strokeStyle='rgba(35,32,25,.52)'; ctx.lineWidth=1.2; ctx.stroke();
+      // layer lines
+      ctx.clip(); ctx.strokeStyle=this.C.layer; for(let yy=py-h*scale/2; yy<py+h*scale/2; yy+=3){ ctx.globalAlpha=.5; ctx.beginPath(); ctx.moveTo(px-w*scale,yy); ctx.lineTo(px+w*scale,yy); ctx.stroke(); } ctx.globalAlpha=1; ctx.restore(); return [px,py]; };
+    part(0,-94,52,52,0,-60);            // head up
+    const torso=part(0,-20,70,108,0,0); // torso center
+    part(-58,-30,30,86,-70,0);          // L arm left
+    part(58,-30,30,86,70,0);            // R arm right
+    part(-22,78,30,92,0,70);            // L leg
+    part(22,78,30,92,0,70);             // R leg
+    // ball-socket connectors at shoulders (ghost-green slide in while exploded)
+    const sock=(sx,sy)=>{ const x=cx+sx*scale, y=cy+sy*scale; ctx.save(); ctx.beginPath(); ctx.arc(x,y,7*scale,0,7);
+      const glow=e>0.15&&e<0.95; ctx.strokeStyle=glow?'rgba(90,203,130,.9)':(seam>0?'rgba(0,164,74,'+seam+')':'rgba(35,32,25,.45)'); ctx.lineWidth=glow?1.6:1.2; if(glow){ctx.shadowColor=this.C.aweak;ctx.shadowBlur=8;} ctx.stroke(); ctx.beginPath(); ctx.arc(x,y,2.6*scale,0,7); ctx.fillStyle=glow?'rgba(90,203,130,.7)':'rgba(150,142,127,.6)'; ctx.fill(); ctx.restore(); };
+    sock(-30,-44); sock(30,-44);
+  }
+  rr(ctx,x,y,w,h,r){ ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+  drawReticle(ctx,W,H){ const y=H*0.18+ (H*0.62)*this.a.scan; ctx.save();
+    // sweeping reticle frame
+    const x0=W*0.22,x1=W*0.78; ctx.strokeStyle='rgba(90,203,130,.7)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.stroke();
+    // corner ticks
+    [[x0,1],[x1,-1]].forEach(([x,d])=>{ ctx.beginPath(); ctx.moveTo(x,y-8); ctx.lineTo(x,y+8); ctx.moveTo(x,y); ctx.lineTo(x+10*d,y); ctx.stroke(); });
+    ctx.restore();
+    // amber marker on geometry flaw
+    if(this.a.marker>0 && this._slotScreen){ const m=this._slotScreen; const col=this.a.markerCol==='green'?this.C.accent:this.C.warn;
+      const op=this.a.marker*(1-this.a.markerDis); ctx.save(); ctx.globalAlpha=op;
+      ctx.strokeStyle=col; ctx.lineWidth=1.4; ctx.beginPath(); ctx.arc(m[0],m[1],11,0,7); ctx.stroke();
+      ctx.beginPath(); ctx.arc(m[0],m[1],2.4,0,7); ctx.fillStyle=col; ctx.fill();
+      // hairline leader to right edge toward feed
+      ctx.lineWidth=1; ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(m[0]+11,m[1]); ctx.lineTo(W-12,m[1]); ctx.stroke();
+      ctx.restore(); }
+  }
+
+  // ===================== demo timeline =====================
+  async runDemo(){
+    if(!this._alive) return; this.goBoot();
+    await this.sleep(450); this.boot.line=1; this.forceUpdate();
+    await this.sleep(420); this.boot.line=2; this.forceUpdate();
+    await this.sleep(420); this.boot.line=3; this.forceUpdate();
+    await this.sleep(700); if(!this._alive||this._skipped) return;
+    await this.startForming();
+  }
+  bootCube=0;
+  goBoot(){ this._skipped=false; this.boot.line=0; this.a.obj='stand'; this.a.form=0; this.a.dim=0; this.a.scanOn=0; this.a.marker=0;
+    this.setState({phase:'boot', showConvo:false, fc:0, isPrinting:false}); this.bootCube=0; this.tweenCube(); }
+  tweenCube(){ const t0=performance.now(); const step=()=>{ if(this.state.phase!=='boot'){this.bootCube=1;return;} this.bootCube=Math.min(1,(performance.now()-t0)/1400); if(this.bootCube<1)requestAnimationFrame(step); }; requestAnimationFrame(step); }
+  skipBoot(){ this._skipped=true; this.startForming(); }
+
+  async startForming(){ this._skipped=true; this.a.obj='stand'; this.a.dim=0; this.a.scanOn=0; this.a.marker=0; this.a.markerDis=0; this.a.markerDisTarget=0;
+    await this.set({phase:'forming', showConvo:true, fv:'parametric', fc:0, isPrinting:false});
+    this.a.form=0; this.tween('form',1,2500,150);
+    await this.sleep(300); this.revealTo(1); await this.sleep(900); this.revealTo(2); await this.sleep(800); this.revealTo(3);
+    await this.sleep(900); if(!this._alive) return;
+    await this.set({phase:'complete'}); this.settlePop();
+    await this.sleep(700); await this.goInspect(true);
+  }
+  settlePop(){ const c=this.canvasRef.current; if(c){ c.style.animation='none'; void c.offsetWidth; c.style.animation='hwsettle .35s ease-out'; } }
+
+  revealTo(n){ this.setState({fc:n}); requestAnimationFrame(()=>{ const f=this.feedRef.current; if(f) f.scrollTop=f.scrollHeight; }); }
+
+  async goInspect(cont){ if(this.state.fv!=='parametric'){ this.setState({fv:'parametric'}); }
+    await this.set({phase:'inspecting'}); this.a.markerDis=0; this.a.markerDisTarget=0;
+    this.a.scanOn=1; this.a.scan=0; this.tween('scan',1,1700,0); this.tween('dim',0.28,400,0);
+    await this.sleep(1700); if(!this._alive) return;
+    this.a.markerCol='amber'; this.tween('marker',1,300,0); this.revealTo(4);
+    if(cont){ await this.sleep(1500); await this.goFix(); }
+  }
+  async goFix(){ this.revealTo(5); this.a.markerCol='green'; await this.sleep(650);
+    this.a.markerDisTarget=1; this.tween('dim',0,500,0);
+    await this.sleep(650); this.a.scanOn=0; this.a.marker=0; this.a.markerDis=0; this.a.markerDisTarget=0;
+    await this.set({phase:'complete'}); this.settlePop();
+    await this.sleep(500); this.revealTo(6); await this.sleep(500); this.revealTo(8);
+  }
+
+  async goStudio(){ this._skipped=true; this.a.obj='figure'; this.a.explode=0; this.a.settle=0; this.a.scanOn=0; this.a.marker=0; this.a.dim=0;
+    await this.set({phase:'studio', showConvo:true});
+    this.tween('explode',1,650,150);          // KF1→2 separate
+    await this.sleep(900);                      // KF3 connectors visible (glow handled in draw)
+    this.tween('explode',0,500,250);           // KF4 snap back
+    await this.sleep(800); this.a.settle=1; this.forceUpdate();
+    setTimeout(()=>{ this.a.settle=0; this.forceUpdate(); }, 700);
+  }
+
+  sendPrint(){ this.setState(s=>({rippleKey:s.rippleKey+1})); this.goPrint(); }
+  async goPrint(){ await this.set({isPrinting:true, phase:'complete'}); this.a.printLayer=12;
+    if(this._printTimer) clearInterval(this._printTimer);
+    this._printTimer=setInterval(()=>{ this.a.printLayer=Math.min(847,this.a.printLayer+7); this.forceUpdate(); if(this.a.printLayer>=847)clearInterval(this._printTimer); },260); }
+
+  // conductor jumps
+  cBoot(){ this.clearTimers(); this.goBoot(); this.runDemo(); }
+  cEmpty(){ this.clearTimers(); this._skipped=true; this.a.form=0; this.a.obj='stand'; this.setState({phase:'empty',showConvo:false,fc:0,isPrinting:false}); }
+  cForming(){ this.clearTimers(); this.startForming(); }
+  cInspect(){ this.clearTimers(); this.setState({fv:'parametric',fc:3,showConvo:true,isPrinting:false},()=>{ this.a.obj='stand'; this.a.form=1; this.goInspect(true); }); }
+  cStudio(){ this.clearTimers(); this.goStudio(); }
+  cPrint(){ this.clearTimers(); this.a.scanOn=0; this.a.marker=0; this.a.dim=0; this.a.markerDis=0; this.a.markerDisTarget=0; this.setState({showConvo:true},()=>this.goPrint()); }
+  cFigure(){ this.clearTimers(); this.a.obj='figure'; this.a.form=1; this.a.explode=0; this.setState({fv:'figure',fc:8,phase:'complete',showConvo:true,mode:'hybrid',isPrinting:false}); }
+  cMic(){ this.setState(s=>({micActive:!s.micActive})); }
+  cMode(){ this.setState(s=>({modePopover:!s.modePopover})); }
+  clearTimers(){ this._skipped=true; if(this._timers)this._timers.forEach(clearTimeout); this._timers=[]; if(this._printTimer)clearInterval(this._printTimer); }
+
+  toggleMode(){ this.setState(s=>({modePopover:!s.modePopover})); }
+  toggleMic(){ this.setState(s=>({micActive:!s.micActive})); }
+  removeRef(){ this.setState({_noref:true}); }
+  applyFix(){ /* note acknowledged */ }
+  pickVersion(i){ this.setState({curVersion:i}); }
+  pickMode(m){ this.setState({mode:m, modePopover:false}); }
+
+  // ===================== render values =====================
+  stageStatus(){ const ph=this.state.phase; const isP=this.state.isPrinting;
+    // [Describe, Design, Validate, Slice, Print]
+    if(ph==='boot'||ph==='empty') return ['active','pend','pend','pend','pend'];
+    if(ph==='forming') return ['done','active','pend','pend','pend'];
+    if(ph==='inspecting'||ph==='fixing'||ph==='studio') return ['done','active','pend','pend','pend'];
+    if(isP) return ['done','done','done','done','active'];
+    return ['done','done','done','active','pend']; // complete resting (slicing)
+  }
+
+  renderVals(){ const C=this.C, st=this.state;
+    // stages
+    const names=['Describe','Design','Validate','Slice','Print']; const ss=this.stageStatus();
+    const stages=names.map((name,i)=>{ const s=ss[i]; let boxStyle, boxText='', labelStyle;
+      const base='width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none;';
+      if(s==='done'){ boxStyle=base+'background:#E6F1EA;border:1px solid #BBDFC8;color:#00A44A;'; boxText='✓'; labelStyle='font-size:12px;font-weight:500;color:#232019;'; }
+      else if(s==='active'){ boxStyle=base+"border:1px solid #BBDFC8;color:#00A44A;background-image:repeating-linear-gradient(0deg,rgba(0,164,74,.85) 0 1px,transparent 1px 3px);background-size:100% 6px;animation:hwlayerfill .9s linear infinite;"; labelStyle='font-size:12px;font-weight:500;color:#232019;'; }
+      else { boxStyle=base+'border:1px solid #C9C3B6;color:#A6A095;'; labelStyle='font-size:12px;font-weight:500;color:#A6A095;'; }
+      return { name, boxStyle, boxText, labelStyle, notLast:i<4 }; });
+
+    // feed rows
+    const data=this.feedData(st.fv).slice(0,st.fc); const miniBars=['▼▁▂▃','▁▼▂▃','▁▂▼▃','▁▂▃▼'];
+    const rows=data.map((r)=>{ const [time,glyph,label,detail,kind,ep]=r;
+      let gutter='transparent', bg='transparent';
+      if(ep==='a'){ gutter='#B26B07'; bg='rgba(178,107,7,0.08)'; } else if(ep==='b'){ gutter='#B88416'; } else if(ep==='c'){ gutter='#1F8F50'; }
+      const rowStyle='display:flex;gap:10px;align-items:flex-start;padding:9px 9px 9px 9px;border-left:2px solid '+gutter+';border-bottom:1px solid #E7E2D7;background:'+bg+';animation:hwfeedin .25s ease-out;';
+      let gc=C.t2; if(kind==='ok')gc=C.aweak; else if(kind==='active')gc=C.accent; else if(kind==='warn')gc=C.warn;
+      const glyphStyle="font-family:'JetBrains Mono',monospace;font-size:12px;width:14px;flex:none;text-align:center;color:"+gc+";";
+      const detailStyle="font-family:'JetBrains Mono',monospace;font-size:11px;line-height:15px;color:"+(kind==='warn'?C.warn:C.faint)+";white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:228px;";
+      return { time,glyph,label,detail,rowStyle,glyphStyle,detailStyle, showBar:kind==='active', bar:miniBars[this.mini] }; });
+
+    // notes
+    const ng=(ok)=>"font-family:'JetBrains Mono',monospace;font-size:12px;flex:none;width:14px;color:"+(ok?C.aweak:C.warn)+";";
+    const notes=[
+      {glyph:'✓',glyphStyle:ng(1),text:'0.3mm tolerance on cable slot — printed holes shrink',action:false},
+      {glyph:'✓',glyphStyle:ng(1),text:'Base edges chamfered — bed adhesion, no supports',action:false},
+      {glyph:'⚠',glyphStyle:ng(0),text:'Riser wall 1.2mm — recommend 1.6mm',action:true},
+      {glyph:'✓',glyphStyle:ng(1),text:'Max overhang 45° — safe unsupported',action:false} ];
+
+    // mode chip
+    const mm={parametric:['⚙','parametric'],figure:['✦','figure'],hybrid:['⚙+✦','hybrid']};
+    const modeRow=(m,label,icon)=>({ icon, name:label, check: st.mode===m?'✓':'', pick:()=>this.pickMode(m),
+      rowStyle:'display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:7px;font-family:\'JetBrains Mono\',monospace;font-size:12px;cursor:pointer;color:#232019;background:'+(st.mode===m?'#DCD7CC':'transparent')+';' });
+    const modeOptions=[ modeRow('parametric','parametric','⚙'), modeRow('figure','figure','✦'), modeRow('hybrid','hybrid','⚙+✦') ];
+
+    // versions
+    const versions=[0,1,2].map(i=>{ const cur=st.curVersion===i; const box='position:relative;width:46px;height:46px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;background:#F0ECE3;border:1px solid '+(cur?'#00A44A':'#C9C3B6')+';';
+      return { label:'v'+(i+1), boxStyle:box, labelStyle:"font-family:'JetBrains Mono',monospace;font-size:11px;color:"+(cur?'#232019':'#6E6A60')+";", warn:i===1, pick:()=>this.pickVersion(i) }; });
+
+    // boot rows
+    const bl=['engines: openscad ✓ · mesh ✓ · blender ✓','printer: BAMBU-A1 online · bed 23°C','ready'];
+    const bootRows=bl.map((text,i)=>{ const shown=this.boot.line>i; const isLast=i===2; const active=this.boot.line===i+1;
+      return { text:shown?text:'', style:'color:'+(i===2?'#1F8F50':'#6E6A60')+';opacity:'+(shown?1:0)+';transition:opacity .2s;min-height:18px;',
+        cursorStyle:(isLast&&shown)?"color:#00A44A;animation:hwblink 1s steps(1) infinite;":'display:none;' }; });
+
+    // wave bars
+    const waveBars=Array.from({length:22},(_,i)=>({ style:'width:3px;flex:1;max-width:4px;border-radius:2px;background:#00A44A;transform-origin:bottom;animation:hwwave '+(0.5+(i%5)*0.12)+'s ease-in-out infinite;animation-delay:'+(i*0.03)+'s;height:100%;' }));
+
+    // dims
+    const dims=[
+      {text:'82 mm', style:"position:absolute;left:23%;top:34%;font-family:'JetBrains Mono',monospace;font-size:11px;color:#6E6A60;border-left:1px solid #B9B2A4;padding-left:8px;"},
+      {text:'15°', style:"position:absolute;left:46%;top:71%;font-family:'JetBrains Mono',monospace;font-size:11px;color:#6E6A60;"},
+      {text:'Ø6 mm', style:"position:absolute;left:24%;top:56%;font-family:'JetBrains Mono',monospace;font-size:11px;color:#6E6A60;border-bottom:1px solid #B9B2A4;padding-bottom:2px;"} ];
+
+    // conductor
+    const cbtn=(label,go)=>({ label, go, style:'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#6E6A60;padding:5px 9px;border-radius:9999px;cursor:pointer;white-space:nowrap;' });
+    const conductor=[ cbtn('▸ replay',()=>this.cBoot()), cbtn('boot',()=>this.cBoot()), cbtn('empty',()=>this.cEmpty()), cbtn('forming',()=>this.cForming()), cbtn('inspect',()=>this.cInspect()), cbtn('studio',()=>this.cStudio()), cbtn('print',()=>this.cPrint()), cbtn('mic',()=>this.cMic()), cbtn('mode',()=>this.cMode()), cbtn('figure',()=>this.cFigure()) ];
+
+    const ph=st.phase;
+    const printPct=Math.round(this.a.printLayer/847*100);
+    return {
+      canvasRef:this.canvasRef, viewportRef:this.viewportRef, feedRef:this.feedRef, scalerRef:this.scalerRef,
+      stages, rows, notes, versions, modeOptions, bootRows, waveBars, dims, conductor, exampleChips:['phone stand','desk hook','figurine'],
+      printerStatusTop:'BAMBU-A1 online',
+      showConvo:st.showConvo, showRefImage: st.mode==='figure'||st.mode==='hybrid', micActive:st.micActive,
+      modeIcon:mm[st.mode][0], modeLabel:mm[st.mode][1], showModePopover:st.modePopover,
+      micBtnStyle:'width:30px;height:30px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;'+(st.micActive?'background:#00A44A;color:#06120B;':'background:#DCD7CC;color:#6E6A60;'),
+      inputPlaceholder: st.micActive?'listening…':"Refine it — e.g. 'make it 20% taller'",
+      showBoot:ph==='boot', showEmpty:ph==='empty',
+      showDims: ph==='complete' && !st.isPrinting && this.a.obj==='stand',
+      showPrinter: ph==='forming' || st.isPrinting,
+      printerArt:this.PRINTER[this.a.printerIdx],
+      printerStatusLine: st.isPrinting? ('printing layer '+this.a.printLayer+'/847') : (ph==='forming'?'rendering preview · pass 2':'idle'),
+      showStudioBadge: ph==='studio', studioStatus:'⚙+✦ hybrid · cutting joints · Ø6mm ball sockets',
+      showInspectLabel: ph==='inspecting' && this.a.marker>0.5,
+      inspectLabelText:'wall 0.9mm', inspectLabelStyle:"position:absolute;left:30%;top:52%;font-family:'JetBrains Mono',monospace;font-size:11px;color:#B26B07;z-index:3;",
+      isPrinting:st.isPrinting, isReady:!st.isPrinting,
+      printJob:'BAMBU-A1 · bed 60°C', printEta:'1h 21m', printLayerText:'layer '+this.a.printLayer+'/847 · 0.2mm',
+      printBarStyle:'height:100%;width:'+printPct+'%;background-image:repeating-linear-gradient(90deg,#00A44A 0 2px,#E6F1EA 2px 4px);transition:width .25s;',
+      feedMode: st.fv==='figure'?'figure · hybrid':'parametric',
+      rippleStyle:'position:absolute;left:50%;top:50%;width:80px;height:80px;margin:-40px 0 0 -40px;border-radius:50%;background:rgba(255,255,255,.5);'+(st.rippleKey>0?'animation:hwripple .6s ease-out;':'opacity:0;'),
+      toggleMode:()=>this.toggleMode(), toggleMic:()=>this.toggleMic(), removeRef:()=>this.removeRef(),
+      skipBoot:()=>this.skipBoot(), sendPrint:()=>this.sendPrint(), applyFix:()=>this.applyFix(),
+    };
+  }
+}
+</script>
+</body>
+</html>

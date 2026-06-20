@@ -1,0 +1,63 @@
+/* Landing-page fonts for new UI (Print Plan panel): Newsreader headings + Inter body.
+   MUST be the first line: CSS requires @import-url to precede all rules, and the bundler
+   inlines `@import "tailwindcss"`/@fontsource below into real rules — so this remote import
+   has to sit above them or the generated CSS fails to parse (the /app + /profile build error). */
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+/* Self-hosted fonts (offline-safe). Sans = Bricolage Grotesque (bold, characterful display
+   grotesque); Mono = JetBrains Mono for machine text. */
+@import "@fontsource/bricolage-grotesque/400.css";
+@import "@fontsource/bricolage-grotesque/500.css";
+@import "@fontsource/bricolage-grotesque/600.css";
+@import "@fontsource/bricolage-grotesque/700.css";
+@import "@fontsource/bricolage-grotesque/800.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/600.css";
+
+/* Hardware Paper tokens (mirror of src/design/tokens.ts) */
+@theme {
+  --color-canvas: #E4DED2;
+  --color-surface: #FBFAF6;
+  --color-inset: #F0ECE3;
+  --color-border: #C9C3B6;
+  --color-border-sub: #DCD7CC;
+  --color-ink: #232019;
+  --color-ink-2: #6E6A60;
+  --color-faint: #A6A095;
+  --color-accent: #cc785c;
+  --color-accent-weak: #a9583e;
+  --color-warn: #B26B07;
+  --color-error: #C0271A;
+  --font-sans: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; background: #E4DED2;
+  height: 100%; width: 100%; overflow: hidden;   /* app is viewport-locked; no document scroll */
+  font-family: "Bricolage Grotesque", system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Hero animation keyframes — ported verbatim from frontend/Claude Hardware.dc.html */
+@keyframes hwblink { 0%,48%{opacity:1} 49%,100%{opacity:0} }
+@keyframes hwsettle { 0%{transform:scale(.975)} 55%{transform:scale(1.012)} 100%{transform:scale(1)} }
+@keyframes hwfeedin { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:none} }
+@keyframes hwlayerfill { from{background-position:0 0} to{background-position:0 -6px} }
+@keyframes hwripple { 0%{transform:scale(1);opacity:.5} 100%{transform:scale(1.9);opacity:0} }
+@keyframes hwwave { 0%,100%{transform:scaleY(.3)} 50%{transform:scaleY(1)} }
+@keyframes hwpulsedot { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+/* RenderLoader (PNG printer) — long-render loading screen. Additive, on-brand:
+   a gentle bob + a green layer-line scan that "prints" up the machine. */
+@keyframes hwbob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+@keyframes hwprintscan { 0%{top:100%;opacity:0} 12%{opacity:.85} 88%{opacity:.85} 100%{top:0;opacity:0} }
+
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #C9C3B6; border-radius: 4px; }

@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#E4DED2;font-family:'Space Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+  ::-webkit-scrollbar{width:9px}::-webkit-scrollbar-thumb{background:#C9C3B6;border-radius:4px}
+  @keyframes hwblink{0%,48%{opacity:1}49%,100%{opacity:0}}
+</style>
+</helmet>
+
+<div ref="{{ rootRef }}" style="min-height:100vh;background:#E4DED2;padding:48px 40px 80px;color:#232019;">
+<div style="max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:38px;">
+
+  <!-- MASTHEAD -->
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;border-bottom:1px solid #DCD7CC;padding-bottom:26px;flex-wrap:wrap;">
+    <div style="display:flex;flex-direction:column;gap:11px;">
+      <div style="display:flex;align-items:center;gap:11px;">
+        <span style="color:#00A44A;font-size:22px;line-height:1;">⬡</span>
+        <span style="font-size:15px;font-weight:600;letter-spacing:.06em;">CLAUDE HARDWARE</span>
+      </div>
+      <div style="font-size:34px;font-weight:700;letter-spacing:-1px;line-height:1.05;">Hardware Paper — State &amp; System Reference</div>
+      <div style="font-size:15px;font-weight:300;color:#6E6A60;max-width:680px;line-height:1.5;">A handoff companion to the live workspace. Every state below is playable there via the demo conductor. Monochrome, one semantic green, flat depth, thin borders. No gradients, no shadows, ever.</div>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#A6A095;border:1px solid #C9C3B6;border-radius:8px;padding:9px 13px;line-height:1.7;">
+      grammar<br><span style="color:#232019;">SANS</span> = human intent<br><span style="color:#232019;">MONO</span> = machine work
+    </div>
+  </div>
+
+  <!-- DESIGN DNA -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.16em;color:#A6A095;">01 · DESIGN DNA</div>
+    <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:16px;">
+
+      <!-- color tokens -->
+      <div style="background:#FBFAF6;border:1px solid #DCD7CC;border-radius:12px;padding:20px;">
+        <div style="font-size:13px;font-weight:500;margin-bottom:16px;">Palette — Hardware Paper</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+          <sc-for list="{{ tokens }}" as="t" hint-placeholder-count="12">
+            <div style="display:flex;flex-direction:column;gap:7px;">
+              <div style="{{ t.swatch }}"></div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#232019;">{{ t.name }}</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#A6A095;">{{ t.hex }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- semantic green + type -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div style="background:#FBFAF6;border:1px solid #DCD7CC;border-radius:12px;padding:20px;">
+          <div style="font-size:13px;font-weight:500;margin-bottom:6px;">Green is semantic only</div>
+          <div style="font-size:12.5px;font-weight:300;color:#6E6A60;line-height:1.5;margin-bottom:14px;">Agent working · verified · print-ready. Amber only for manufacturability. Never decorative; one green-filled button per screen.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#00A44A;border:1px solid #BBDFC8;background:#E6F1EA;border-radius:9999px;padding:5px 11px;">● working</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#1F8F50;border:1px solid #BBDFC8;background:#E6F1EA;border-radius:9999px;padding:5px 11px;">✓ verified</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#B26B07;border:1px solid #E6D3A8;background:#FBF1DE;border-radius:9999px;padding:5px 11px;">⚠ warning</span>
+          </div>
+        </div>
+        <div style="background:#FBFAF6;border:1px solid #DCD7CC;border-radius:12px;padding:20px;flex:1;display:flex;flex-direction:column;justify-content:center;gap:12px;">
+          <div style="display:flex;align-items:baseline;gap:12px;">
+            <span style="font-size:11px;color:#A6A095;width:42px;font-family:'JetBrains Mono',monospace;">sans</span>
+            <span style="font-size:24px;font-weight:500;letter-spacing:-.5px;">Make it 20% taller</span>
+          </div>
+          <div style="height:1px;background:#DCD7CC;"></div>
+          <div style="display:flex;align-items:baseline;gap:12px;">
+            <span style="font-size:11px;color:#A6A095;width:42px;font-family:'JetBrains Mono',monospace;">mono</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:14px;color:#1F8F50;">✓ write_scad · 42 lines · 0.2mm</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- layer-line motif -->
+    <div style="background:#FBFAF6;border:1px solid #DCD7CC;border-radius:12px;padding:20px;display:flex;align-items:center;gap:28px;">
+      <canvas data-draw="layers" style="width:240px;height:96px;flex:none;"></canvas>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="font-size:13px;font-weight:500;">The layer line — signature motif</div>
+        <div style="font-size:12.5px;font-weight:300;color:#6E6A60;line-height:1.55;max-width:760px;">Prints build from stacked horizontal layers, so accumulating 1px horizontal lines <span style="color:#232019;">are</span> the brand. Dividers, progress fills, the active stage tracker, and the forming animation are all built bottom-up from layer lines. This is the one flourish; everything else stays disciplined.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRINTERLOADER -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.16em;color:#A6A095;">02 · THE PRINTERLOADER — replaces every spinner</div>
+    <div style="background:#FBFAF6;border:1px solid #DCD7CC;border-radius:12px;padding:24px;">
+      <div style="display:flex;gap:30px;align-items:flex-start;flex-wrap:wrap;">
+        <sc-for list="{{ printerFrames }}" as="f" hint-placeholder-count="4">
+          <div style="display:flex;flex-direction:column;gap:9px;align-items:center;">
+            <pre style="margin:0;font-family:'JetBrains Mono',monospace;font-size:14px;line-height:15px;color:#00A44A;">{{ f.art }}</pre>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#A6A095;">{{ f.label }}</div>
+          </div>
+        </sc-for>
+        <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:14px;border-left:1px solid #DCD7CC;padding-left:30px;align-self:stretch;justify-content:center;">
+          <div style="font-size:12.5px;font-weight:300;color:#6E6A60;line-height:1.55;">Mono, green, width-stable, cycled ~180ms. The nozzle ▼ sweeps the gantry and finished rows join the solid stack — over a long wait the part visibly prints. A blinking-cursor status binds to the live agent step.</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#A6A095;">printing layer 23/847<span style="color:#00A44A;animation:hwblink 1s steps(1) infinite;">▍</span></div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#A6A095;display:flex;align-items:center;gap:10px;">small inline <span style="color:#00A44A;letter-spacing:1px;">▼▁▂▃▄▅</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEED ANATOMY -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.16em;color:#A6A095;">03 · AGENT ACTIVITY FEED — proof of agency</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <sc-for list="{{ feeds }}" as="feed" hint-placeholder-count="2">
+        <div style="background:#FBFAF6;border:1px solid #DCD7CC;border-radius:12px;padding:18px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.14em;color:#A6A095;">{{ feed.title }}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#1F8F50;">{{ feed.tag }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;">
+            <sc-for list="{{ feed.rows }}" as="row" hint-placeholder-count="8">
+              <div style="{{ row.rowStyle }}">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#A6A095;width:34px;flex:none;">{{ row.time }}</span>
+                <span style="{{ row.glyphStyle }}">{{ row.glyph }}</span>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;">
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:#232019;">{{ row.label }}</span>
+                  <span style="{{ row.detailStyle }}">{{ row.detail }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="margin-top:13px;font-size:11.5px;font-weight:300;color:#A6A095;line-height:1.5;">{{ feed.note }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- FIVE HERO MOMENTS -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.16em;color:#A6A095;">04 · THE FIVE HERO MOMENTS</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;">
+      <sc-for list="{{ heroes }}" as="h" hint-placeholder-count="5">
+        <div style="background:#FBFAF6;border:1px solid #DCD7CC;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;">
+          <div style="position:relative;background:#ECE7DC;border-bottom:1px solid #DCD7CC;">
+            <canvas data-draw="{{ h.draw }}" style="width:100%;height:148px;display:block;"></canvas>
+            <span style="position:absolute;top:9px;left:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#A6A095;">{{ h.num }}</span>
+          </div>
+          <div style="padding:13px 14px 16px;display:flex;flex-direction:column;gap:6px;">
+            <div style="font-size:13.5px;font-weight:600;">{{ h.title }}</div>
+            <div style="font-size:12px;font-weight:300;color:#6E6A60;line-height:1.5;">{{ h.desc }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- STUDIO KEYFRAMES -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.16em;color:#A6A095;">05 · STUDIO MOMENT — joint choreography (4 keyframes)</div>
+    <div style="background:#FBFAF6;border:1px solid #DCD7CC;border-radius:12px;padding:20px;">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
+        <sc-for list="{{ keyframes }}" as="k" hint-placeholder-count="4">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="position:relative;background:#ECE7DC;border:1px solid #DCD7CC;border-radius:9px;overflow:hidden;">
+              <canvas data-draw="{{ k.draw }}" style="width:100%;height:188px;display:block;"></canvas>
+              <span style="position:absolute;top:8px;left:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#1F8F50;">KF{{ k.n }}</span>
+            </div>
+            <div style="font-size:12.5px;font-weight:500;">{{ k.title }}</div>
+            <div style="font-size:11.5px;font-weight:300;color:#6E6A60;line-height:1.5;">{{ k.desc }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#A6A095;border-top:1px solid #DCD7CC;padding-top:22px;">→ open <span style="color:#232019;">Claude Hardware.dc.html</span> for the live, playable workspace · auto-plays once, then replay any moment from the demo conductor</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  rootRef = React.createRef();
+  C = { objFill:'#E6E1D6', objBack:'#D6CFC2', layer:'#B9B2A4', accent:'#00A44A', aweak:'#1F8F50', warn:'#B26B07', text:'#232019' };
+
+  componentDidMount(){ this._draw=()=>this.drawAll(); this._draw(); setTimeout(this._draw,120); setTimeout(this._draw,500);
+    window.addEventListener('resize', this._draw); }
+  componentWillUnmount(){ window.removeEventListener('resize', this._draw); }
+
+  drawAll(){ const root=this.rootRef.current; if(!root) return;
+    root.querySelectorAll('canvas[data-draw]').forEach(c=>{ const dpr=Math.min(2,window.devicePixelRatio||1);
+      const w=c.clientWidth,h=c.clientHeight; if(!w) return; c.width=w*dpr; c.height=h*dpr; const ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+      ctx.clearRect(0,0,w,h); ctx.fillStyle='#ECE7DC'; ctx.fillRect(0,0,w,h); this.render(ctx,w,h,c.getAttribute('data-draw')); }); }
+
+  render(ctx,w,h,mode){
+    if(mode==='layers'){ return this.dLayers(ctx,w,h); }
+    if(mode==='boot'){ return this.dCube(ctx,w,h); }
+    if(mode==='forming'){ return this.dStand(ctx,w,h,{form:0.56,scan:true}); }
+    if(mode==='complete'){ return this.dStand(ctx,w,h,{form:1,dims:true}); }
+    if(mode==='inspect'){ return this.dStand(ctx,w,h,{form:1,dim:0.28,marker:'amber'}); }
+    if(mode==='printing'){ return this.dStand(ctx,w,h,{form:1,print:0.62}); }
+    if(mode==='kf1'){ return this.dFig(ctx,w,h,{e:0}); }
+    if(mode==='kf2'){ return this.dFig(ctx,w,h,{e:1}); }
+    if(mode==='kf3'){ return this.dFig(ctx,w,h,{e:1,conn:true}); }
+    if(mode==='kf4'){ return this.dFig(ctx,w,h,{e:0,seam:true}); }
+  }
+
+  dLayers(ctx,w,h){ // accumulating layer lines forming a bar, brightest at top (newest green)
+    const x0=14,x1=w-14, base=h-12, top=18; ctx.lineWidth=1;
+    for(let y=base;y>top;y-=4){ const t=(base-y)/(base-top); ctx.strokeStyle=this.C.layer; ctx.globalAlpha=0.35+t*0.5; ctx.beginPath(); ctx.moveTo(x0,y+.5); ctx.lineTo(x1,y+.5); ctx.stroke(); }
+    ctx.globalAlpha=1; ctx.strokeStyle=this.C.accent; ctx.shadowColor=this.C.accent; ctx.shadowBlur=8; ctx.beginPath(); ctx.moveTo(x0,top+.5); ctx.lineTo(x1,top+.5); ctx.stroke(); ctx.shadowBlur=0; }
+
+  dCube(ctx,w,h){ const cx=w/2,cy=h/2,s=Math.min(w,h)*0.26,d=s*0.45; ctx.strokeStyle='rgba(120,113,99,.55)'; ctx.lineWidth=1.2;
+    const fr=[[-s,-s],[s,-s],[s,s],[-s,s]].map(p=>[cx+p[0],cy+p[1]]); const bk=fr.map(p=>[p[0]+d,p[1]-d]);
+    ctx.beginPath(); for(let i=0;i<4;i++){ctx.moveTo(fr[i][0],fr[i][1]);ctx.lineTo(fr[(i+1)%4][0],fr[(i+1)%4][1]);} for(let i=0;i<4;i++){ctx.moveTo(bk[i][0],bk[i][1]);ctx.lineTo(bk[(i+1)%4][0],bk[(i+1)%4][1]);} for(let i=0;i<4;i++){ctx.moveTo(fr[i][0],fr[i][1]);ctx.lineTo(bk[i][0],bk[i][1]);} ctx.stroke(); }
+
+  standPolys(){ return [ [[-92,0],[92,0],[92,22],[-92,22]], [[58,22],[92,22],[92,30],[72,48],[58,48]], [[-92,22],[-50,22],[-2,200],[-44,200]] ]; }
+  dStand(ctx,w,h,o){ const polys=this.standPolys(); const objH=200, scale=Math.min(w*0.5/210,h*0.74/objH); const baseY=h*0.86,cx=w*0.5; const dx=14,dy=-7;
+    const L=(x,y,ox,oy)=>[cx+x*scale+(ox||0),baseY-y*scale+(oy||0)];
+    const trace=(off)=>{ctx.beginPath(); for(const p of polys){p.forEach((q,i)=>{const s=L(q[0],q[1],off?dx:0,off?dy:0); i?ctx.lineTo(s[0],s[1]):ctx.moveTo(s[0],s[1]);}); ctx.closePath();}};
+    trace(true); ctx.fillStyle=this.C.objBack; ctx.fill();
+    ctx.strokeStyle='rgba(150,142,127,.85)'; ctx.lineWidth=1; for(const p of polys)for(const q of p){const f=L(q[0],q[1],0,0),b=L(q[0],q[1],dx,dy);ctx.beginPath();ctx.moveTo(f[0],f[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();}
+    const formY=baseY-(o.form||1)*objH*scale; ctx.save(); trace(false); ctx.clip(); ctx.beginPath(); ctx.rect(0,formY,w,h); ctx.clip();
+    ctx.fillStyle=this.C.objFill; ctx.fillRect(0,0,w,h); ctx.strokeStyle=this.C.layer; ctx.lineWidth=1;
+    for(let y=baseY;y>baseY-objH*scale-4;y-=3){ ctx.globalAlpha=(Math.round((baseY-y)/3)%4===0)?0.8:0.38; ctx.beginPath(); ctx.moveTo(0,y+.5); ctx.lineTo(w,y+.5); ctx.stroke(); }
+    // print progress: green layer fill rising from base
+    if(o.print){ const pY=baseY-o.print*objH*scale; ctx.globalAlpha=1; for(let y=baseY;y>pY;y-=3){ ctx.strokeStyle=(Math.round((baseY-y)/3)%4===0)?this.C.accent:'rgba(0,164,74,.4)'; ctx.beginPath(); ctx.moveTo(0,y+.5); ctx.lineTo(w,y+.5); ctx.stroke(); } }
+    ctx.globalAlpha=1; ctx.restore();
+    ctx.strokeStyle='rgba(35,32,25,.62)'; ctx.lineWidth=1.2; trace(false); ctx.stroke();
+    const slot=L(-46,118,0,0); ctx.beginPath(); ctx.ellipse(slot[0],slot[1],5*scale,9*scale,.12,0,7); ctx.fillStyle='#ECE7DC'; ctx.fill(); ctx.strokeStyle='rgba(35,32,25,.45)'; ctx.lineWidth=1; ctx.stroke();
+    if(o.scan){ ctx.strokeStyle=this.C.accent; ctx.lineWidth=1.4; ctx.shadowColor=this.C.accent; ctx.shadowBlur=8; ctx.beginPath(); ctx.moveTo(w*0.16,formY); ctx.lineTo(w*0.84,formY); ctx.stroke(); ctx.shadowBlur=0; }
+    if(o.dim){ ctx.fillStyle='rgba(244,241,233,'+o.dim+')'; ctx.fillRect(0,0,w,h); const ry=h*0.42; ctx.strokeStyle='rgba(90,203,130,.75)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(w*0.2,ry); ctx.lineTo(w*0.8,ry); ctx.stroke(); }
+    if(o.marker){ const col=this.C.warn; ctx.strokeStyle=col; ctx.lineWidth=1.4; ctx.beginPath(); ctx.arc(slot[0],slot[1],10,0,7); ctx.stroke(); ctx.beginPath(); ctx.arc(slot[0],slot[1],2.2,0,7); ctx.fillStyle=col; ctx.fill(); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(slot[0]+10,slot[1]); ctx.lineTo(w-8,slot[1]); ctx.stroke(); }
+    if(o.dims){ ctx.fillStyle='#6E6A60'; ctx.font="10px 'JetBrains Mono',monospace"; ctx.fillText('82mm',w*0.16,h*0.34); ctx.fillText('15°',cx-4,baseY-6); }
+  }
+
+  dFig(ctx,w,h,o){ const scale=Math.min(w,h)/300; const cx=w/2,cy=h*0.47,e=o.e||0;
+    const part=(x,y,pw,ph,ex,ey)=>{ const px=cx+x*scale+ex*e*scale,py=cy+y*scale+ey*e*scale; ctx.save(); ctx.beginPath(); const r=Math.min(pw,ph)*scale*0.4;
+      this.rr(ctx,px-pw*scale/2,py-ph*scale/2,pw*scale,ph*scale,r); ctx.fillStyle=this.C.objFill; ctx.fill(); ctx.strokeStyle=o.seam?'rgba(0,164,74,.85)':'rgba(35,32,25,.52)'; ctx.lineWidth=o.seam?1.5:1.1; ctx.stroke();
+      ctx.clip(); ctx.strokeStyle=this.C.layer; for(let yy=py-ph*scale/2;yy<py+ph*scale/2;yy+=3){ctx.globalAlpha=.5;ctx.beginPath();ctx.moveTo(px-pw*scale,yy);ctx.lineTo(px+pw*scale,yy);ctx.stroke();} ctx.globalAlpha=1; ctx.restore(); };
+    part(0,-72,44,44,0,-46); part(0,-14,58,86,0,0); part(-48,-22,24,70,-58,0); part(48,-22,24,70,58,0); part(-18,62,24,74,0,56); part(18,62,24,74,0,56);
+    const sock=(sx,sy)=>{ const x=cx+sx*scale,y=cy+sy*scale; ctx.save(); ctx.beginPath(); ctx.arc(x,y,6*scale,0,7);
+      if(o.conn){ctx.strokeStyle='rgba(90,203,130,.95)';ctx.lineWidth=1.6;ctx.shadowColor=this.C.aweak;ctx.shadowBlur=9;} else if(o.seam){ctx.strokeStyle=this.C.accent;ctx.lineWidth=1.4;} else {ctx.strokeStyle='rgba(35,32,25,.45)';ctx.lineWidth=1.1;}
+      ctx.stroke(); ctx.shadowBlur=0; ctx.beginPath(); ctx.arc(x,y,2.2*scale,0,7); ctx.fillStyle=o.conn?'rgba(90,203,130,.8)':'rgba(150,142,127,.6)'; ctx.fill(); ctx.restore(); };
+    sock(-24,-34); sock(24,-34); }
+  rr(ctx,x,y,w,h,r){ ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+  feedRows(v){ const C=this.C; const data = v==='figure' ? [
+      ['00:01','◆','plan','figure from reference · est. 38mm','plan',null],
+      ['00:04','●','generate_mesh','image → mesh · ~45s','active',null],
+      ['00:52','✓','generate_mesh','142k tris · watertight','ok',null],
+      ['00:55','✓','repair_mesh','decimated 80k · manifold ok','ok',null],
+      ['00:58','◆','add_joints','shoulders · ball sockets Ø6mm','plan',null],
+      ['01:03','⚠','inspect_render','left socket wall 0.9mm — too thin','warn','a'],
+      ['01:04','◆','fix','socket offset +0.4mm, re-cutting','fix','b'],
+      ['01:07','✓','validate','printable · supports: arms only','ok','c'] ] : [
+      ['00:01','◆','plan','base plate → 15° riser → cable slot','plan',null],
+      ['00:03','✓','write_scad','phone_stand.scad · 42 lines','ok',null],
+      ['00:06','✓','render_preview','4 angles · 1.2s','ok',null],
+      ['00:08','⚠','inspect_render','cable slot intersects riser wall','warn','a'],
+      ['00:09','◆','fix','shifting slot 4mm left, re-rendering','fix','b'],
+      ['00:11','✓','render_preview','clean','ok','c'],
+      ['00:13','✓','validate','printable · no supports needed','ok',null],
+      ['00:14','●','slice','847 layers · 0.2mm','active',null] ];
+    return data.map(([time,glyph,label,detail,kind,ep])=>{ let gutter='transparent',bg='transparent';
+      if(ep==='a'){gutter='#B26B07';bg='rgba(178,107,7,0.08)';} else if(ep==='b'){gutter='#B88416';} else if(ep==='c'){gutter='#1F8F50';}
+      let gc=C.text; if(kind==='ok')gc=C.aweak; else if(kind==='active')gc=C.accent; else if(kind==='warn')gc=C.warn; else gc='#6E6A60';
+      return { time,glyph,label,detail,
+        rowStyle:'display:flex;gap:10px;align-items:flex-start;padding:6px 8px 6px 9px;border-left:2px solid '+gutter+';background:'+bg+';border-radius:0 5px 5px 0;',
+        glyphStyle:"font-family:'JetBrains Mono',monospace;font-size:12px;width:14px;flex:none;text-align:center;color:"+gc+";",
+        detailStyle:"font-family:'JetBrains Mono',monospace;font-size:11px;line-height:15px;color:"+(kind==='warn'?C.warn:'#A6A095')+";white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" }; }); }
+
+  renderVals(){
+    const tk=(name,hex,extra)=>({name,hex,swatch:'height:42px;border-radius:7px;background:'+hex+';'+(extra||'border:1px solid #C9C3B6;')});
+    const tokens=[ tk('canvas','#E4DED2','border:1px solid #C9C3B6;'), tk('surface','#FBFAF6','border:1px solid #C9C3B6;'), tk('inset','#F0ECE3','border:1px solid #C9C3B6;'), tk('border','#C9C3B6','border:1px solid #2f2f2f;'),
+      tk('text','#232019',''), tk('text-2nd','#6E6A60',''), tk('faint','#A6A095',''), tk('border-sub','#DCD7CC','border:1px solid #C9C3B6;'),
+      tk('accent','#00A44A',''), tk('accent-weak','#1F8F50',''), tk('warn','#B26B07',''), tk('error','#C0271A','') ];
+    const P=['┌─▼━━━━━━━━┐\n│ ▓░       │\n│ ████████ │\n│ ████████ │\n╘═◉══════◉╛',
+             '┌━━━▼━━━━━━┐\n│ ▓▓▓▓░    │\n│ ████████ │\n│ ████████ │\n╘═◉══════◉╛',
+             '┌━━━━━━━▼━━┐\n│ ▓▓▓▓▓▓▓░ │\n│ ████████ │\n│ ████████ │\n╘═◉══════◉╛',
+             '┌─▼━━━━━━━━┐\n│ ░        │\n│ ████████ │\n│ ████████ │\n╘═◉══════◉╛'];
+    const printerFrames=P.map((art,i)=>({art,label:'frame '+(i+1)}));
+    const feeds=[ {title:'PARAMETRIC · phone_stand',tag:'● slicing',rows:this.feedRows('parametric'),note:'Rows 00:08→00:11 read as one episode: the gutter line transitions amber→green and the ⚠ row gets a 4% amber tint. The agent finds its own flaw and fixes it.'},
+      {title:'FIGURE + HYBRID · figurine',tag:'✓ printable',rows:this.feedRows('figure'),note:'Same anatomy for image→mesh and joint insertion. generate_mesh and add_joints are long waits — the PrinterLoader animates beside them.'} ];
+    const heroes=[
+      {num:'01',draw:'boot',title:'Boot',desc:'Machine self-test types on; the empty cube draws in layer lines. Skippable.'},
+      {num:'02',draw:'forming',title:'Forming',desc:'Object materializes bottom-up in layer slices as a green scanline sweeps up.'},
+      {num:'03',draw:'inspect',title:'Inspection',desc:'Reticle sweeps; an amber marker pins the exact flaw, leader to the feed row.'},
+      {num:'04',draw:'kf2',title:'Studio',desc:'Figure explodes; ghost ball-sockets slide into the cut faces, then snap back.'},
+      {num:'05',draw:'printing',title:'Send to print',desc:'Live job: layer-line progress, ASCII printer, camera feed. One green button.'} ];
+    const keyframes=[
+      {n:1,draw:'kf1',title:'Assembled',desc:'Figure complete after generate_mesh + repair. Joint seams hidden.'},
+      {n:2,draw:'kf2',title:'Exploded',desc:'Torso, limbs and head separate along their axes — reads across a room.'},
+      {n:3,draw:'kf3',title:'Sockets slide',desc:'Ghost-green ball-socket connectors slide into the cut faces, glowing.'},
+      {n:4,draw:'kf4',title:'Snap + pulse',desc:'Parts settle back in 150ms; joint seams pulse green once, then go solid.'} ];
+    return { rootRef:this.rootRef, tokens, printerFrames, feeds, heroes, keyframes };
+  }
+}
+</script>
+</body>
+</html>
