@@ -52,10 +52,12 @@ export async function POST(req: Request) {
         const tris = parseStlAuto(await readMesh(meshUrl));
         if (!tris.length) throw new Error("couldn't read the model mesh");
 
-        // EXPORT: write OBJ + 3MF (STL already exists at meshUrl).
+        // EXPORT: write OBJ + 3MF in parallel (STL already exists at meshUrl).
         send({ t: ts(), kind: "tool", name: "export", status: "running", detail: "writing 3MF + OBJ…" });
-        await writeFile(path.join(jobDir, "model.obj"), trisToObj(tris));
-        await writeFile(path.join(jobDir, "model.3mf"), trisTo3mf(tris));
+        await Promise.all([
+          writeFile(path.join(jobDir, "model.obj"), trisToObj(tris)),
+          writeFile(path.join(jobDir, "model.3mf"), trisTo3mf(tris)),
+        ]);
         const formats: ExportFormat[] = [
           { format: "stl", url: meshUrl, label: "STL" },
           { format: "obj", url: `/generated/${jobId}/model.obj`, label: "OBJ (keeps geometry)" },
