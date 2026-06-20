@@ -1,7 +1,8 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import type { Mode } from "@/lib/viewModel";
 import type { ChatMsg } from "@/lib/projects";
+import { pickSuggestions, matchSuggestion } from "@/lib/promptSuggestions";
 
 const THINKING_WORDS = [
   "Thinking", "Designing", "Pondering", "Sketching", "Imagining", "Conjuring",
@@ -38,6 +39,14 @@ const EXAMPLES = [
   "a rounded box with a lid",
 ];
 
+const CATEGORY_ICON: Record<string, string> = {
+  figure: "\u2726",
+  functional: "\u2699",
+  art: "\u25C6",
+  mechanical: "\u2692",
+  toy: "\u25B3",
+};
+
 export interface ConversationPanelProps {
   mode: Mode;
   showConvo: boolean;
@@ -72,6 +81,8 @@ export function ConversationPanel(p: ConversationPanelProps) {
   const [icon, label] = MODE_META[p.mode];
   const [text, setText] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const suggestions = useMemo(() => pickSuggestions(5), []);
+  const ghostText = useMemo(() => matchSuggestion(text), [text]);
   const submit = () => {
     const t = text.trim();
     if (t) { p.onSubmitPrompt?.(t); setText(""); }
@@ -123,13 +134,14 @@ export function ConversationPanel(p: ConversationPanelProps) {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: ".14em", color: "#A6A095" }}>TRY ONE</div>
-              {EXAMPLES.map((c) => (
+              {suggestions.map((s) => (
                 <div
-                  key={c}
-                  onClick={() => p.onSubmitPrompt?.(c)}
-                  style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: "#232019", background: "#F0ECE3", border: "1px solid #DCD7CC", borderRadius: 9, padding: "8px 11px", cursor: "pointer" }}
+                  key={s.text}
+                  onClick={() => p.onSubmitPrompt?.(s.text)}
+                  style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: "#232019", background: "#F0ECE3", border: "1px solid #DCD7CC", borderRadius: 9, padding: "8px 11px", cursor: "pointer", display: "flex", alignItems: "center", gap: 7 }}
                 >
-                  {c}
+                  <span style={{ color: "#A6A095", fontSize: 10 }}>{CATEGORY_ICON[s.category] ?? ""}</span>
+                  <span>{s.text}</span>
                 </div>
               ))}
             </div>
@@ -165,14 +177,31 @@ export function ConversationPanel(p: ConversationPanelProps) {
             title={p.voiceSupported === false ? "Voice not supported in this browser" : "Speak your idea"}
             style={{ width: 30, height: 30, borderRadius: "50%", flex: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, cursor: "pointer", ...(p.micActive ? { background: "#cc785c", color: "#ffffff" } : { background: "#DCD7CC", color: "#6E6A60" }) }}
           >●</div>
-          <input
-            value={p.micActive ? (p.transcript ?? "") : text}
-            readOnly={p.micActive}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-            placeholder={p.micActive ? "listening…" : "Describe anything — e.g. 'a block house…'"}
-            style={{ flex: 1, minWidth: 0, fontSize: 13, color: "#232019", fontWeight: 500, background: "transparent", border: "none", outline: "none", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" }}
-          />
+          <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
+            <input
+              value={p.micActive ? (p.transcript ?? "") : text}
+              readOnly={p.micActive}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { submit(); return; }
+                if (e.key === "Tab" && ghostText && !p.micActive) {
+                  e.preventDefault();
+                  setText(ghostText);
+                }
+              }}
+              placeholder={p.micActive ? "listening…" : "Describe anything — e.g. 'a phone stand…'"}
+              style={{ width: "100%", minWidth: 0, fontSize: 13, color: "#232019", fontWeight: 500, background: "transparent", border: "none", outline: "none", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", position: "relative", zIndex: 1 }}
+            />
+            {ghostText && text.length >= 2 && !p.micActive && (
+              <div
+                aria-hidden
+                style={{ position: "absolute", top: 0, left: 0, fontSize: 13, fontWeight: 500, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", pointerEvents: "none", whiteSpace: "nowrap", overflow: "hidden" }}
+              >
+                <span style={{ visibility: "hidden" }}>{text}</span>
+                <span style={{ color: "#C9C3B6" }}>{ghostText.slice(text.length)}</span>
+              </div>
+            )}
+          </div>
           <span onClick={() => fileRef.current?.click()} title="Attach a reference image" style={{ color: "#A6A095", fontSize: 14, cursor: "pointer", paddingRight: 4 }}>📎</span>
           <input
             ref={fileRef}
