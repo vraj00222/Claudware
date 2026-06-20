@@ -110,7 +110,7 @@ async function claudePlan(prompt: string, base?: string): Promise<GenPlan> {
 
 /** Last-resort plan so the route never hard-fails — multi-stage so it still shows step-by-step. */
 function fallbackPlan(prompt: string): GenPlan {
-  const h = `// ${prompt.trim()}\n$fn=48;\n`;
+  const h = `// ${prompt.trim().replace(/\n/g, "\n// ")}\n$fn=48;\n`;
   return {
     object: "block",
     summary: `${prompt.trim()} (generic block)`,
@@ -350,11 +350,16 @@ export async function POST(req: Request) {
           }
         } else if (isEdit) {
           try { plan = await claudePlan(prompt, base); source = "claude-edit"; }
-          catch { plan = fallbackPlan(prompt); source = "fallback"; }
+          catch (e) { console.error("[claudePlan edit FAILED]", (e as Error)?.message); plan = fallbackPlan(prompt); source = "fallback"; }
         } else {
           const det = planOpenscad(prompt);
           if (det) { plan = det; source = "deterministic"; }
-          else { try { plan = await claudePlan(prompt); source = "claude"; } catch { plan = fallbackPlan(prompt); source = "fallback"; } }
+          else {
+            console.error("[claudePlan] ANTHROPIC_API_KEY in env:", process.env.ANTHROPIC_API_KEY ? `yes (len ${process.env.ANTHROPIC_API_KEY.length})` : "NO");
+            const _t0 = Date.now();
+            try { plan = await claudePlan(prompt); source = "claude"; console.error(`[claudePlan OK] ${Date.now() - _t0}ms, ${plan.stages.length} stages`); }
+            catch (e) { console.error(`[claudePlan FAILED] after ${Date.now() - _t0}ms:`, (e as Error)?.message); plan = fallbackPlan(prompt); source = "fallback"; }
+          }
         }
 
         const live = isBlender ? await blenderLiveAvailable() : false;

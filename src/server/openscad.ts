@@ -80,7 +80,7 @@ function houseStages(prompt: string): GenPlan {
   };
 
   // shared header + modules; a stage just calls the modules it has "built" so far.
-  const header = `// ${prompt.trim()}
+  const header = `// ${prompt.trim().replace(/\n/g, "\n// ")}
 $fn = 48;
 W = ${W}; D = ${D}; H = ${H};   // footprint + wall height (mm)
 t = 3; fl = 3;                  // wall thickness, floor thickness
@@ -171,7 +171,7 @@ function boxStages(prompt: string): GenPlan {
   const hollow = /\b(box|case|tray|container|enclosure|holder)\b/.test(p);
   const lid = /\blid\b/.test(p);
   const params = { W, D: 40, H: 30, t: 2.4, windows: 0 };
-  const header = `// ${prompt.trim()}
+  const header = `// ${prompt.trim().replace(/\n/g, "\n// ")}
 $fn = 32;
 W = ${W}; D = 40; H = 30; t = 2.4; r = 4;
 module solid() { minkowski() { cube([W - 2*r, D - 2*r, H - 2*r]); sphere(r); } }
@@ -193,7 +193,7 @@ function cylinderStages(prompt: string): GenPlan {
   const H = num(/(\d+)\s*mm\s*(tall|high)/, p, 50);
   const hollow = /\b(tube|pipe|vase|cup|mug|pot|ring|hollow)\b/.test(p);
   const params = { Dia, H, t: 2.4, windows: 0 };
-  const header = `// ${prompt.trim()}
+  const header = `// ${prompt.trim().replace(/\n/g, "\n// ")}
 $fn = 96;
 Dia = ${Dia}; H = ${H}; t = 2.4; fl = 2.4;
 `;

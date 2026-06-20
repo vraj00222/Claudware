@@ -1,0 +1,9 @@
+{
+  "enabledPlugins": {
+    "ux-strategy@designer-skills": true,
+    "design-research@designer-skills": true,
+    "design-systems@designer-skills": true,
+    "designer-toolkit@designer-skills": true,
+    "ui-design@designer-skills": true
+  }
+}

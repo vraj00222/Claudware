@@ -40,12 +40,13 @@ hero-*.png
 # next.js generated (regenerated on build/dev)
 next-env.d.ts
 
-# InsForge & AI agent skills
+# InsForge (.insforge/project.json holds a real API key — keep OUT of the repo)
 .insforge
+
+# AI agent skills/config — .claude (settings only) IS pushed; the rest stay local
 .agent
 .agents
 .augment
-.claude
 .cline
 .github/copilot*
 .kilocode
@@ -57,7 +58,3 @@ next-env.d.ts
 
 # BOSL2 OpenSCAD library (cloned via setup, not vendored)
 tools/openscad-libs/
-
-# markdown docs are local context only — never committed (must stay LAST so it
-# overrides the !demo-fixtures/** re-include above)
-*.md
