@@ -1,5 +1,5 @@
 import { planOpenscad, estimateFromStl, type GenPlan, type Stage } from "@/server/openscad";
-import { claudeBpyPlan, fallbackBpyPlan, renderStageBlender, blenderLiveAvailable, importGlbToLive, cleanStlInBlender } from "@/server/blender";
+import { claudeBpyPlan, fallbackBpyPlan, renderStageBlender, blenderLiveAvailable, importGlbToLive, cleanStlInBlender, validateStl } from "@/server/blender";
 import { fusionAvailable, generateFusion, classifyFusionBuild, generateFusionAssembly } from "@/server/fusion";
 import { resolveEngine, type RequestedEngine, type ConcreteEngine } from "@/server/engineRoute";
 import { enginePrimer } from "@/server/skills";
@@ -363,15 +363,30 @@ export async function POST(req: Request) {
         let lastStl = "", lastMeshUrl = "", lastSource = "", meshes = 0;
         for (let i = 0; i < plan.stages.length; i++) {
           const st = plan.stages[i];
+          const isFinalStage = i === plan.stages.length - 1;
           if (!isBlender) await writeFile(WATCH, st.scad);
           send({ t: ts(), kind: "tool", name: "render_preview", status: "running", detail: st.label });
           const stl = path.join(jobDir, `stage${i}.stl`);
           let unknown: string[] = [];
           try {
-            if (isBlender) await renderStageBlender(st.scad, stl, path.join(jobDir, `stage${i}.py`), live);
+            if (isBlender) await renderStageBlender(st.scad, stl, path.join(jobDir, `stage${i}.py`), live, isFinalStage);
             else unknown = await renderStage(st.scad, stl, path.join(jobDir, `stage${i}.scad`));
             if (!existsSync(stl)) throw new Error("no geometry produced");
+            // Validate STL has real geometry (not just a header / empty file)
+            if (isBlender && !validateStl(stl)) {
+              // On edit, keep the previous good mesh instead of emitting a broken one
+              if (isEdit && lastStl) {
+                send({ t: ts(), kind: "tool", name: "render_preview", status: "warn", detail: `${st.label}: produced empty mesh — kept the previous version` });
+                continue;
+              }
+              throw new Error("empty STL (no geometry)");
+            }
           } catch (err) {
+            // On edit failure: keep previous good mesh, warn instead of dead-ending
+            if (isEdit && lastStl) {
+              send({ t: ts(), kind: "tool", name: "render_preview", status: "warn", detail: `${st.label}: ${(err as Error).message.slice(0, 60)} — kept previous version` });
+              continue;
+            }
             send({ t: ts(), kind: "tool", name: "render_preview", status: "error", detail: `${st.label}: ${(err as Error).message.slice(0, 80)}` });
             continue;
           }
@@ -384,7 +399,12 @@ export async function POST(req: Request) {
           await sleep(650);
         }
         if (meshes === 0) {
-          send({ t: ts(), kind: "summary", text: "couldn't render this one — try rephrasing or another engine" });
+          // Edit produced nothing — never dead-end, provide actionable guidance
+          if (isEdit) {
+            send({ t: ts(), kind: "summary", text: "couldn't apply that edit cleanly — try a simpler change or regenerate from scratch" });
+          } else {
+            send({ t: ts(), kind: "summary", text: "couldn't render this one — try rephrasing or another engine" });
+          }
           return;
         }
         await finish(lastStl, lastMeshUrl, engineName, `${plan.object} ready — ${plan.stages.length} build steps`, lastSource, plan.stages.length);

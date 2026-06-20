@@ -107,16 +107,31 @@ for _o in _ms:
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.mesh.remove_doubles(threshold=0.0005)
     bpy.ops.mesh.normals_make_consistent(inside=False)
+    try:
+        bpy.ops.mesh.fill_holes(sides=0)
+    except Exception:
+        pass
     bpy.ops.object.mode_set(mode='OBJECT')
     if len(_o.data.polygons) > 250000:
-        # gentle, only on a TRULY dense mesh — TRELLIS figures are ~15–50k and must NOT be decimated
-        # (0.5 rounded off the already-low-poly figure → a blobby downgrade). 0.6 + a higher gate keeps detail.
         _d = _o.modifiers.new('dec','DECIMATE'); _d.ratio = 0.6
         bpy.ops.object.modifier_apply(modifier=_d.name)
-if _ms:
+# Join all mesh objects into one solid
+_ms2 = [o for o in bpy.data.objects if o.type == 'MESH']
+if len(_ms2) > 1:
     bpy.ops.object.select_all(action='DESELECT')
-    for _o in _ms: _o.select_set(True)
-    bpy.context.view_layer.objects.active = _ms[0]
+    for _o in _ms2: _o.select_set(True)
+    bpy.context.view_layer.objects.active = _ms2[0]
+    bpy.ops.object.join()
+# Auto-ground: translate so min Z = 0
+_ms3 = [o for o in bpy.data.objects if o.type == 'MESH']
+if _ms3:
+    _min_z = min(min((_o.matrix_world @ v.co).z for v in _o.data.vertices) for _o in _ms3 if _o.data.vertices)
+    if abs(_min_z) > 0.001:
+        for _o in _ms3: _o.location.z -= _min_z
+        bpy.context.view_layer.update()
+    bpy.ops.object.select_all(action='DESELECT')
+    for _o in _ms3: _o.select_set(True)
+    bpy.context.view_layer.objects.active = _ms3[0]
     bpy.ops.wm.stl_export(filepath=${JSON.stringify(outStl)}, export_selected_objects=True, apply_modifiers=True, ascii_format=True, up_axis='Z', forward_axis='Y', global_scale=1.0)
     print('CLEAN_OK')
 else:
@@ -127,15 +142,16 @@ else:
     try { await execBlenderCode(code, 90_000); if (produced()) return "live"; } catch { /* fall to headless */ }
   }
   await writeFile(pyPath, code);
-  await execFileP(BLENDER, ["--background", "--factory-startup", "--python", pyPath], { timeout: 90_000, maxBuffer: 16 << 20 });
+  await execFileP(BLENDER, ["--background", "--factory-startup", "--python", pyPath], { timeout: 90_000, maxBuffer: 8 << 20 });
   if (produced()) return "headless";
   throw new Error("blender cleanup produced no STL");
 }
 
 // ───────────────────────── stage wrapper (build + export) ─────────────────────────
 
-/** Wrap a stage's bpy body with a clean rebuild + ASCII-STL export. Z-up matches OpenSCAD STL. */
-export function wrapStage(body: string, stlPath: string): string {
+/** Wrap a stage's bpy body with a clean rebuild + ASCII-STL export. Z-up matches OpenSCAD STL.
+ *  `isFinal` = true for the last stage → triggers join + ground + manifold cleanup. */
+export function wrapStage(body: string, stlPath: string, isFinal = false): string {
   // JSON.stringify gives a safe single-quote-free Python string literal for the path.
   const p = JSON.stringify(stlPath);
   return `import bpy
@@ -165,7 +181,42 @@ if _nonmesh:
         bpy.ops.object.convert(target='MESH')
     except Exception as _ex:
         print('CONVERT_FAIL', _ex)
-
+${isFinal ? `
+# ===== FINAL STAGE: join → ground → manifold cleanup =====
+_meshes_pre = [o for o in bpy.data.objects if o.type == 'MESH']
+if len(_meshes_pre) > 1:
+    bpy.ops.object.select_all(action='DESELECT')
+    for _o in _meshes_pre:
+        _o.select_set(True)
+    bpy.context.view_layer.objects.active = _meshes_pre[0]
+    bpy.ops.object.join()
+# Apply all pending transforms so geometry is in world space
+for _o in [o for o in bpy.data.objects if o.type == 'MESH']:
+    _o.select_set(True)
+    bpy.context.view_layer.objects.active = _o
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+# Weld doubles + fill holes for manifold cleanup
+for _o in [o for o in bpy.data.objects if o.type == 'MESH']:
+    bpy.ops.object.select_all(action='DESELECT')
+    _o.select_set(True)
+    bpy.context.view_layer.objects.active = _o
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.remove_doubles(threshold=0.001)
+    try:
+        bpy.ops.mesh.fill_holes(sides=0)
+    except Exception:
+        pass
+    bpy.ops.object.mode_set(mode='OBJECT')
+# AUTO-GROUND: translate so lowest vertex sits at Z = 0
+_all_mesh = [o for o in bpy.data.objects if o.type == 'MESH']
+if _all_mesh:
+    _min_z = min(min((_o.matrix_world @ v.co).z for v in _o.data.vertices) for _o in _all_mesh if _o.data.vertices)
+    if abs(_min_z) > 0.001:
+        for _o in _all_mesh:
+            _o.location.z -= _min_z
+        bpy.context.view_layer.update()
+` : ''}
 # Recalculate OUTWARD-consistent normals on every mesh. Blender's solid view draws backfaces, but
 # r3f's single-sided MeshStandardMaterial hides reversed faces (the missing-roof bug) — fix before export.
 for _o in [o for o in bpy.data.objects if o.type == 'MESH']:
@@ -196,14 +247,16 @@ else:
 `;
 }
 
-/** Render one stage to an STL. Prefers the live window (watchable) and falls back to headless. */
+/** Render one stage to an STL. Prefers the live window (watchable) and falls back to headless.
+ *  `isFinal` = true for the last stage → triggers join + ground + manifold cleanup in wrapStage. */
 export async function renderStageBlender(
   body: string,
   stlPath: string,
   pyPath: string,
   preferLive: boolean,
+  isFinal = false,
 ): Promise<"live" | "headless"> {
-  const wrapped = wrapStage(body, stlPath);
+  const wrapped = wrapStage(body, stlPath, isFinal);
   const produced = () => existsSync(stlPath) && statSync(stlPath).size > 0;
   if (preferLive) {
     try {
@@ -212,7 +265,7 @@ export async function renderStageBlender(
     } catch { /* socket hiccup → fall back to headless for this stage */ }
   }
   await writeFile(pyPath, wrapped);
-  await execFileP(BLENDER, ["--background", "--factory-startup", "--python", pyPath], { timeout: 90_000, maxBuffer: 16 << 20 });
+  await execFileP(BLENDER, ["--background", "--factory-startup", "--python", pyPath], { timeout: 90_000, maxBuffer: 8 << 20 });
   if (produced()) return "headless";
   throw new Error("blender produced no STL (empty geometry — bpy created nothing exportable)");
 }
@@ -223,16 +276,32 @@ const SCALE_HINT =
   "Model in Blender units where 1 unit = 1 mm; keep the whole model within roughly 20–80 units and " +
   "sitting on the Z=0 ground plane (printable flat base, +Z up).";
 
+const PRINTABILITY_BLOCK = `
+**PRINTABILITY (non-negotiable):**
+- The FINAL model MUST be ONE CONNECTED SOLID. After the last stage, join all mesh objects
+  with bpy.ops.object.join(). If parts overlap, use a boolean UNION (bpy.ops.object.modifier_add
+  type='BOOLEAN', operation='UNION') to fuse them. No separate floating pieces — if there is a base
+  disc or platform, it MUST be fused/intersecting with the body, NOT hovering underneath.
+- It MUST sit flat on the build plate: after joining, translate so the lowest vertex Z = 0.
+- No thin walls below ~1.2 mm at print scale. No tiny disconnected crumbs.
+- Provide a flat-ish bottom contact patch (at least ~8mm diameter) for bed adhesion.
+- Keep it watertight/manifold (no holes, no inverted faces).
+- Stages are CUMULATIVE — each stage adds to the previous. The last stage is the finished,
+  printable, single-solid model.
+`;
+
 /** Ask the Claude CLI for a staged bpy plan (arbitrary prompts; no API key). `base` = refine-in-place. */
 export async function claudeBpyPlan(prompt: string, base?: string, primer = ""): Promise<GenPlan> {
   const editIntro = base
     ? `Here is the CURRENT model's final-stage bpy script. MODIFY it to satisfy this change: "${prompt}".\n` +
       `Keep what works; change only what the request implies. Re-emit the FULL staged build.\n` +
+      `The result MUST still be a single connected solid sitting on Z=0 — obey the printability rules below.\n` +
       `--- CURRENT SCRIPT ---\n${base}\n--- END ---\n\n`
     : "";
   const instruction =
     `You are a Blender ${"bpy"} expert procedurally modelling a 3D-PRINTABLE object: "${prompt}".\n` +
     editIntro + (primer ? primer + "\n" : "") +
+    PRINTABILITY_BLOCK +
     `Output 3 to 4 CUMULATIVE build stages (fewer = faster). For EACH stage output exactly this, nothing else:\n` +
     `@@@STAGE <snake_case_label> | <short detail>\n` +
     `<a COMPLETE, self-contained Python (bpy) program that builds the model UP TO this stage>\n\n` +
@@ -240,8 +309,10 @@ export async function claudeBpyPlan(prompt: string, base?: string, primer = ""):
     `PREFER mesh primitives (bpy.ops.mesh.primitive_*), modifiers and boolean ops; metaballs/curves/text ` +
     `are allowed (they're auto-converted to mesh). Keep each stage CONCISE. Do NOT clear the scene, do NOT ` +
     `add cameras/lights, do NOT export — that is handled for you. ` +
-    `Stage 1 = rough base form, last stage = finished, recognizable model. Each stage stands alone and creates ` +
-    `non-empty geometry. No prose, no markdown, no backticks. Begin your reply immediately with "@@@STAGE".`;
+    `In the FINAL stage, JOIN all objects (bpy.ops.object.join()) and translate so min Z = 0.\n` +
+    `Stage 1 = rough base form, last stage = finished, recognizable, SINGLE-SOLID model sitting on Z=0. ` +
+    `Each stage stands alone and creates non-empty geometry. No prose, no markdown, no backticks. ` +
+    `Begin your reply immediately with "@@@STAGE".`;
   const stdout = await claudeText(instruction, { model: BLENDER_MODEL, maxTokens: 12_000, timeoutMs: 120_000 });
 
   const stages: Stage[] = [];
@@ -257,8 +328,17 @@ export async function claudeBpyPlan(prompt: string, base?: string, primer = ""):
   return { object: "model", summary: prompt.trim(), stages, params: {} };
 }
 
+/** Validate an STL file has actual geometry (non-empty, has triangles). */
+export function validateStl(stlPath: string): boolean {
+  if (!existsSync(stlPath)) return false;
+  const size = statSync(stlPath).size;
+  if (size < 100) return false;
+  return true;
+}
+
 /** Last-resort procedural bpy plan so the Blender route never hard-fails. Uses real MESH primitives
- *  (uv_sphere/cone) — NOT metaballs — so it always exports a non-empty STL and renders in the viewport. */
+ *  (uv_sphere/cone) — NOT metaballs — so it always exports a non-empty STL and renders in the viewport.
+ *  The final stage JOINS all parts and grounds at Z=0 (printable single-solid). */
 export function fallbackBpyPlan(prompt: string): GenPlan {
   const defs =
     `import bpy\n` +
@@ -274,13 +354,27 @@ export function fallbackBpyPlan(prompt: string): GenPlan {
     `    ball(s*3.2,-7,30,1.8)\n` +     // eyes
     `    cone(s*5,0,36,2.4,4)\n` +      // ears
     `    ball(s*6,0,2,3.2)\n`;          // feet
+  // Final stage: join everything into one solid + ground at Z=0
+  const joinGround =
+    `# JOIN all into one printable solid + ground at Z=0\n` +
+    `_all = [o for o in bpy.data.objects if o.type == 'MESH']\n` +
+    `if len(_all) > 1:\n` +
+    `    bpy.ops.object.select_all(action='DESELECT')\n` +
+    `    for _o in _all: _o.select_set(True)\n` +
+    `    bpy.context.view_layer.objects.active = _all[0]\n` +
+    `    bpy.ops.object.join()\n` +
+    `_final = [o for o in bpy.data.objects if o.type == 'MESH']\n` +
+    `if _final:\n` +
+    `    _min_z = min(min(v.co.z for v in _o.data.vertices) for _o in _final if _o.data.vertices)\n` +
+    `    if abs(_min_z) > 0.001:\n` +
+    `        for _o in _final: _o.location.z -= _min_z\n`;
   return {
     object: "figure",
     summary: `${prompt.trim()} (procedural figure)`,
     stages: [
       { label: "base_body", detail: "core body", scad: defs + body },
       { label: "add_head", detail: "+ head", scad: defs + body + headP },
-      { label: "add_features", detail: "+ eyes, ears, feet", scad: defs + body + headP + feats },
+      { label: "add_features", detail: "+ eyes, ears, feet (joined + grounded)", scad: defs + body + headP + feats + joinGround },
     ],
     params: {},
   };
