@@ -290,6 +290,20 @@ const PRINTABILITY_BLOCK = `
   printable, single-solid model.
 `;
 
+// Common sense rules for printable design (shared with OpenSCAD in route.ts)
+const BLENDER_COMMON_SENSE =
+  `\n**COMMON SENSE for real-world printable objects (MUST follow):**\n` +
+  `- KEYCHAINS: MUST have a THROUGH-HOLE near one end for a keyring (diameter ~5-6mm, all the way through). ` +
+  `Use a boolean DIFFERENCE cylinder to cut the hole. Without a through-hole it is not a keychain.\n` +
+  `- TEXT/SPELLING: Copy the EXACT spelling from the user's prompt — every character matters. ` +
+  `"CLAUDE HARDWARE" is NOT "CLAUDWARE". Use bpy font objects (bpy.data.fonts, bpy.ops.object.text_add) ` +
+  `with extrude ≥0.8mm so text is visible when printed. Convert to mesh before joining.\n` +
+  `- COINS/MEDALS: At least 3-4mm thick. Add a raised rim. Text clearly readable.\n` +
+  `- PHONE STANDS: Back support at ~60-75°, front lip, cable slot at bottom (~15mm wide).\n` +
+  `- HOOKS: Opening large enough for purpose. Mounting hole or flat back.\n` +
+  `- ALL THROUGH-HOLES: Use boolean DIFFERENCE, not just a visual indent.\n` +
+  `- Round sharp edges with bevel modifier (0.5-1mm) for printability.\n`;
+
 /** Ask the Claude CLI for a staged bpy plan (arbitrary prompts; no API key). `base` = refine-in-place. */
 export async function claudeBpyPlan(prompt: string, base?: string, primer = ""): Promise<GenPlan> {
   const editIntro = base
@@ -302,6 +316,7 @@ export async function claudeBpyPlan(prompt: string, base?: string, primer = ""):
     `You are a Blender ${"bpy"} expert procedurally modelling a 3D-PRINTABLE object: "${prompt}".\n` +
     editIntro + (primer ? primer + "\n" : "") +
     PRINTABILITY_BLOCK +
+    BLENDER_COMMON_SENSE +
     `Output 3 to 4 CUMULATIVE build stages (fewer = faster). For EACH stage output exactly this, nothing else:\n` +
     `@@@STAGE <snake_case_label> | <short detail>\n` +
     `<a COMPLETE, self-contained Python (bpy) program that builds the model UP TO this stage>\n\n` +
