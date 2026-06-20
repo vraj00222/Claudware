@@ -22,6 +22,27 @@
 - Verified: 115/115 tests green · `npm run build` clean (13 routes) · OpenSCAD + classify smoke-tested live.
   NEXT: Vraj visually tests Blender / Fusion / NVIDIA (now on the Messages API) + the voice loop.
 
+## DEMO BACKLOG — from Vraj test feedback (10h to demo; priority order)
+P1. NVIDIA NIM "fetch failed" — ROOT CAUSE: hosted TRELLIS function 500s (`nvcf-status: errored`) after ~91s,
+    triggered by the heavy `ss_sampling_steps:50 / slat_sampling_steps:50` knob (server-side timeout). Also
+    `requestGlb` doesn't catch network errors → a single blip throws "fetch failed" instead of retrying. FIX:
+    lighter default sampling (test 20/20 or default), try/catch around each fetch (transient → retry), and on
+    total NVIDIA failure surface a clear chip + offer Blender fallback so the demo never dead-ends.
+P1. Printable pipeline — must be FASTER and produce ACTUALLY printable output. Blender "snail" = a blobby
+    shell floating above a separate base (not a watertight printable solid) — can't demo printing that.
+P2. Blender output quality — bpy prompt should make GROUNDED, watertight, single-solid, recognizable models
+    (snail came out blobby + floating). A Blender EDIT iteration ("snail WITH shell") returned a broken/empty
+    mesh (UI showed a PNG-placeholder = mesh failed to load). Harden the edit path.
+P2. Clarify questions must be CONTEXT-AWARE — don't ask Palm/Hand/Display size for a mechanical/Fusion part
+    (e.g. "wall mount"); ask actual mm dimensions (W×D×H or a key dimension) instead. Figures keep size buckets.
+P3. NVIDIA + Browserbase reference-context — when the user NAMES a real/branded thing (e.g. "Tesla/Optimus
+    robot"), use Browserbase to find a reference IMAGE online → Claude vision describes it → pass that image +
+    description into TRELLIS so the output actually resembles it (today we only send a text guess).
+P3. Prompt UX — show example-prompt SUGGESTIONS; let the user TAB to accept/navigate + submit via keyboard
+    (not just click). (Touches src/components — needs the "change the design" allowance.)
+P3. Prompt refinement — add the useful context / strip noise per engine. (Open Q from Vraj: "use token company"
+    — meaning unclear; possibly token-counting to trim long prompts. Confirm intent before building.)
+
 ## HOW TO CHECK THE SITE (dev)
 - Start (if not running): `npm run dev` → http://localhost:3000  (next.config rewrite needs a restart to load)
 - `/`        = the animated LANDING page (rewrite → /landing.html). CTAs → /app.

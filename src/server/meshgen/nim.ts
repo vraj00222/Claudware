@@ -32,19 +32,28 @@ function artifactB64(j: NimResponse): string | null {
  *  Returns the GLB base64, or null when the result came back empty (caller retries — TRELLIS occasionally
  *  returns an empty artifact under load, which used to fall straight to the procedural blob = "did nothing"). */
 async function requestGlb(prompt: string, seed: number, signal: AbortSignal): Promise<string | null> {
-  const res = await fetch(ENDPOINT, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json", Accept: "application/json" },
-    // Max sampling steps (50) → more geometric + texture detail on figures (free knob; ~2× slower).
-    body: JSON.stringify({ mode: "text", prompt, seed, ss_sampling_steps: 50, slat_sampling_steps: 50 }),
-    signal,
-  });
+  let res: Response;
+  try {
+    res = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json", Accept: "application/json" },
+      // DEFAULT sampling only: the hosted TRELLIS function 500s ("nvcf-status: errored", ~90s) whenever
+      // ss/slat_sampling_steps are set — verified 50/50→500 AND 20/20→500, but no-steps→200 fulfilled GLB.
+      body: JSON.stringify({ mode: "text", prompt, seed }),
+      signal,
+    });
+  } catch {
+    return null; // network blip ("fetch failed") → treat as transient so the caller RETRIES, never dead-ends
+  }
   if (res.status === 202) {
     const reqId = res.headers.get("nvcf-reqid");
     if (!reqId) return null;
     for (let i = 0; i < 30; i++) {                    // ~30 × 4s = up to 2 min of polling
       await sleep(4000);
-      const pr = await fetch(STATUS_URL(reqId), { headers: { Authorization: `Bearer ${KEY}`, Accept: "application/json" }, signal });
+      let pr: Response;
+      try {
+        pr = await fetch(STATUS_URL(reqId), { headers: { Authorization: `Bearer ${KEY}`, Accept: "application/json" }, signal });
+      } catch { return null; }                         // poll network blip → retry the whole request
       if (pr.status === 202) continue;                // still pending
       if (!pr.ok) return null;                         // poll failed → let the caller retry the request
       return artifactB64((await pr.json()) as NimResponse);

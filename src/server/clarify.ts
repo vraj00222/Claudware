@@ -31,12 +31,32 @@ const SIZE: Question = {
   },
 };
 
+/** Mechanical PARTS (bracket, wall mount, holder…) don't have a "palm/hand/display" feel — they have a
+ *  real dimension. Ask for the longest edge in mm (with mm buckets + free-text), not the figure buckets.
+ *  Free text already parses units (e.g. "120", "5cm", "2in") → mm in ClarifyCard. */
+const PART_SIZE: Question = {
+  id: "size",
+  label: "Key size — longest edge in mm? (or type an exact value)",
+  allowFreeText: true,
+  options: [
+    { label: "~40 mm", value: "size≈40mm" },
+    { label: "~90 mm", value: "size≈90mm" },
+    { label: "~150 mm", value: "size≈150mm" },
+  ],
+  sizeMm: { "size≈40mm": 40, "size≈90mm": 90, "size≈150mm": 150 },
+};
+
+/** Pick the size question that fits the subject: mechanical parts get mm; figures/containers keep the
+ *  palm/hand/display buckets (a "wall mount" asked for "Display-size" was the wrong question). */
+export function sizeQuestion(c: PromptClass): Question {
+  return c === "part" ? PART_SIZE : SIZE;
+}
+
 /** Deterministic fallback questions. We deliberately DON'T guess surface/pose here: a blind
  *  "Scales / Furry?" on a Lego Luffy is worse than asking nothing. When Claude can't tailor
- *  questions, we only ask SIZE (universal, and it drives real-world scale). Prompt-specific look
- *  details come from Claude's knowledge + web-research at enrichment time, not from forcing chips. */
-export function heuristicQuestions(_p: string): Question[] {
-  return [SIZE];
+ *  questions, we only ask SIZE (universal, and it drives real-world scale) — mm for parts. */
+export function heuristicQuestions(p: string): Question[] {
+  return [sizeQuestion(classifyPrompt(p))];
 }
 
 /** Ask Claude for clarifying questions SPECIFIC to this prompt — but ONLY for details that are
