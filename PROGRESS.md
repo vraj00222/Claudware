@@ -597,6 +597,20 @@ P3. Prompt refinement — add the useful context / strip noise per engine. (Open
       • DEFERRED (still): overhang heat-map viewport overlay; (P3/P4) Blender auto-thicken/repair TRANSFORMS (reported
         only now), real decompose&nest geometry, OrcaSlicer G-code. The Fusion assembly part graph feeds the decompose stage.
 
+- [x] PR #6: NVIDIA OUTPUT QUALITY FIX. Root cause: enrichPrompt was generating 60-100 word descriptors
+      that CONFUSED TRELLIS (produces blobs with verbose prompts). Fixes: (1) enrichPrompt now 25-45 words
+      (TRELLIS works BETTER with fewer); (2) glbToStl decimation threshold 200k→500k, ratio 0.2→0.5 + light
+      smooth pass; (3) self-inspect threshold 0.45→0.55, retries with SHORTER prompts + 3 seeds; (4) NIM
+      retries 6→8; (5) Blender fallback if all NVIDIA retries score <0.3. 143/143 tests, build clean.
+
+- [x] PR #7: COMMON SENSE FOR PRINTABLE DESIGN. Root cause: Claude had no knowledge of HOW objects
+      actually work physically — keychains without holes, blind holes instead of through-holes, misspelled
+      text, paper-thin coins. Fix: COMMON_SENSE_BLOCK injected into BOTH OpenSCAD (route.ts) and Blender
+      (blender.ts) generation prompts. Covers: keychains (through-hole mandatory), text/spelling (exact
+      copy from prompt), coins (3-4mm thick, raised rim), phone stands (cable slot, angled back), hooks
+      (adequate opening), containers (press-fit lip), through-holes (difference not indent), fillets.
+      143/143 tests, build clean.
+
 ## ★ NEXT SESSION — FOCUS: make the app produce WORKING / EXPECTED output (Vraj's priority, ordered)
 1. NVIDIA REFERENCE-IMAGE LIKENESS (Vraj: "nvidia is not able to get access to the image"). Root: we send
    Claude's TEXT description to TRELLIS text→3D, never the pixels (hosted image→3D 500s). (a) prove/log that

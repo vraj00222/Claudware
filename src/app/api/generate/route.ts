@@ -56,6 +56,30 @@ function ensureBosl2Parts(scad: string): string {
   return `${BOSL2_HEADER}\n${stripped}`;
 }
 
+// ───────────────────────── common sense for printable design ─────────────────────────
+// Injected into BOTH OpenSCAD and Blender prompts so Claude "knows" how physical objects work.
+const COMMON_SENSE_BLOCK =
+  `\n**COMMON SENSE for real-world printable objects (MUST follow):**\n` +
+  `- KEYCHAINS: MUST have a THROUGH-HOLE (not blind/one-sided) near one end for a keyring — ` +
+  `diameter ~5-6mm, going all the way through the part. Without a through-hole it is not a keychain.\n` +
+  `- TEXT/SPELLING: When embossing or engraving text, copy the EXACT spelling from the prompt. ` +
+  `Double-check every character. "CLAUDE HARDWARE" is NOT "CLAUDWARE" or "CLUDE". Use linear_extrude ` +
+  `on text() (OpenSCAD) or bpy font objects (Blender). Make text at least 1.5mm tall and 0.8mm deep ` +
+  `so it is visible when printed. Emboss (raised) is preferred over engrave (cut) for small text.\n` +
+  `- COINS/MEDALS: Should be at least 3-4mm thick (not paper-thin). Add a raised rim/edge. ` +
+  `Text should be clearly readable — use a clean sans-serif font at adequate size.\n` +
+  `- PHONE STANDS: Must have a back support angled ~60-75° and a front lip to hold the phone. ` +
+  `Include a cable/charging slot at the bottom center (~15mm wide, ~8mm tall). ` +
+  `Make it stable (wide base, low center of gravity).\n` +
+  `- HOOKS/HANGERS: The hook opening must be large enough for its purpose (~8-12mm for keychains, ` +
+  `~25-35mm for wall hooks). Include a mounting hole or flat back for attachment.\n` +
+  `- CONTAINERS/BOXES: Wall thickness ≥1.5mm. If it has a lid, design a press-fit lip (~0.3mm clearance). ` +
+  `Rounded interior corners for easier printing.\n` +
+  `- NAMEPLATES/TAGS: Minimum 3mm thick for rigidity. Text raised ≥0.8mm or engraved ≥1mm.\n` +
+  `- GENERAL: All holes that need to go THROUGH must use difference() (OpenSCAD) or boolean DIFFERENCE ` +
+  `(Blender) — never leave them as blind pockets unless explicitly requested. Round sharp edges ` +
+  `with small fillets/chamfers (0.5-1mm) for printability and safety.\n`;
+
 /** Ask the Claude CLI for a staged OpenSCAD plan (delimiter format, not JSON; BOSL2 available). */
 async function claudePlan(prompt: string, base?: string): Promise<GenPlan> {
   const editIntro = base
@@ -76,6 +100,7 @@ async function claudePlan(prompt: string, base?: string): Promise<GenPlan> {
     `ball_bearing("608"), cuboid([x,y,z],rounding=), cyl(d=,h=,rounding=|chamfer=), and up()/down()/left()/` +
     `right()/fwd()/back() for placement. Prefer these over hand-rolled cylinders so threads/gears are real ` +
     `and printable. (Do NOT add include lines for the part libraries — they are injected automatically.)\n` +
+    COMMON_SENSE_BLOCK +
     `Rules: millimetres; watertight & printable; keep $fn ≤ 64 (gears/threads render slowly otherwise); ` +
     `stage 1 = rough base, last stage = finished model; each stage's code stands alone and renders ` +
     `non-empty. No prose, no markdown, no backticks. Begin your reply immediately with "@@@STAGE".`;
