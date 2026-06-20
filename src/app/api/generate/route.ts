@@ -272,58 +272,65 @@ export async function POST(req: Request) {
         }
 
         // ───────────────────────────── NVIDIA (organic / figure "wow") ─────────────────────────────
+        // Wrapped in try/catch: if the ENTIRE NVIDIA path fails (scale, inspect, export — not just NIM),
+        // fall through to the Blender engine so the demo never dead-ends on a figure prompt.
         if (engineName === "nvidia") {
-          send({ t: ts(), kind: "tool", name: "inspect_render", status: "running", detail: refImageUrl ? "reading your reference image…" : "researching the look…" });
-          const { enrichPrompt, describeImage } = await import("@/server/promptEnrich");
-          let basePrompt = prompt;
-          if (refImageUrl) {
-            // Vision reads the actual pixels (TRELLIS can't), so SURFACE what Claude saw — that proves the
-            // ref image was read and makes a bad likeness self-explanatory (was silent → "NVIDIA ignored it").
-            const desc = await describeImage(refImageUrl, jobDir);
-            if (desc) {
-              basePrompt = `${prompt}. The reference image shows: ${desc}`;
-              send({ t: ts(), kind: "tool", name: "inspect_render", status: "done", detail: `saw in image: ${desc.slice(0, 80)}` });
-            } else {
-              send({ t: ts(), kind: "tool", name: "inspect_render", status: "warn", detail: "couldn't read the reference image — using your text only" });
-            }
-          }
-          const genPrompt = await enrichPrompt(basePrompt);
-          send({ t: ts(), kind: "tool", name: "inspect_render", status: "done", detail: genPrompt.slice(0, 90) });
-
-          let r = await genNvidia(genPrompt, 0);
-          const FIGURE_DEFAULT_MM = 120;
-          const targetMm = sizeMm && sizeMm > 0 ? sizeMm : FIGURE_DEFAULT_MM;
-          const { scaleStlFileToHeight } = await import("@/server/meshScale");
-          let stlPath = await scaleStlFileToHeight(r.stlPath, targetMm, path.join(jobDir, "scaled.stl"));
-
-          // SELF-INSPECT → bounded retry (free, constitution's inspect→fix). Fails open; skip via DISABLE_INSPECT=1.
-          if (process.env.DISABLE_INSPECT !== "1" && r.provider === "nim") {
-            send({ t: ts(), kind: "tool", name: "inspect_render", status: "running", detail: "checking the result looks right…" });
-            const insp = await scoreModel(stlPath, prompt, jobDir);
-            if (insp) {
-              send({ t: ts(), kind: "tool", name: "inspect_render", status: insp.ok ? "done" : "warn", detail: `likeness ${insp.score ?? "?"} · ${insp.reason}` });
-              if (insp.score !== null && insp.score < 0.45) {
-                send({ t: ts(), kind: "fix", text: "the shape didn't read clearly — regenerating with a stronger description…" });
-                const r2 = await genNvidia(`${genPrompt}, accurate recognizable likeness, clear silhouette`, 1);
-                const stl2 = await scaleStlFileToHeight(r2.stlPath, targetMm, path.join(jobDir, "scaled2.stl"));
-                const insp2 = await scoreModel(stl2, prompt, jobDir);
-                if (insp2 && (insp2.score ?? 0) >= (insp.score ?? 0)) { r = r2; stlPath = stl2; }
-                send({ t: ts(), kind: "tool", name: "inspect_render", status: "done", detail: `retry likeness ${insp2?.score ?? "?"}` });
+          try {
+            send({ t: ts(), kind: "tool", name: "inspect_render", status: "running", detail: refImageUrl ? "reading your reference image…" : "researching the look…" });
+            const { enrichPrompt, describeImage } = await import("@/server/promptEnrich");
+            let basePrompt = prompt;
+            if (refImageUrl) {
+              const desc = await describeImage(refImageUrl, jobDir);
+              if (desc) {
+                basePrompt = `${prompt}. The reference image shows: ${desc}`;
+                send({ t: ts(), kind: "tool", name: "inspect_render", status: "done", detail: `saw in image: ${desc.slice(0, 80)}` });
+              } else {
+                send({ t: ts(), kind: "tool", name: "inspect_render", status: "warn", detail: "couldn't read the reference image — using your text only" });
               }
             }
-          }
+            const genPrompt = await enrichPrompt(basePrompt);
+            send({ t: ts(), kind: "tool", name: "inspect_render", status: "done", detail: genPrompt.slice(0, 90) });
 
-          const meshUrl = `/generated/${jobId}/${path.basename(stlPath)}`;
-          const glbUrl = r.glbPath ? `/generated/${jobId}/${path.basename(r.glbPath)}` : undefined;
-          send({ t: ts(), kind: "mesh", url: meshUrl, glbUrl, textured: r.textured, label: "model", stage: 1, totalStages: 1 });
+            let r = await genNvidia(genPrompt, 0);
+            const FIGURE_DEFAULT_MM = 120;
+            const targetMm = sizeMm && sizeMm > 0 ? sizeMm : FIGURE_DEFAULT_MM;
+            const { scaleStlFileToHeight } = await import("@/server/meshScale");
+            let stlPath = await scaleStlFileToHeight(r.stlPath, targetMm, path.join(jobDir, "scaled.stl"));
 
-          // "NVIDIA + Blender": drop the mesh into the user's LIVE Blender to see/refine (when the socket's up).
-          if (r.glbPath && (await blenderLiveAvailable())) {
-            const ok = await importGlbToLive(r.glbPath);
-            if (ok) send({ t: ts(), kind: "tool", name: "repair_mesh", status: "done", detail: "opened in Blender — refine it there" });
+            // SELF-INSPECT → bounded retry (free, constitution's inspect→fix). Fails open; skip via DISABLE_INSPECT=1.
+            if (process.env.DISABLE_INSPECT !== "1" && r.provider === "nim") {
+              send({ t: ts(), kind: "tool", name: "inspect_render", status: "running", detail: "checking the result looks right…" });
+              const insp = await scoreModel(stlPath, prompt, jobDir);
+              if (insp) {
+                send({ t: ts(), kind: "tool", name: "inspect_render", status: insp.ok ? "done" : "warn", detail: `likeness ${insp.score ?? "?"} · ${insp.reason}` });
+                if (insp.score !== null && insp.score < 0.45) {
+                  send({ t: ts(), kind: "fix", text: "the shape didn't read clearly — regenerating with a stronger description…" });
+                  const r2 = await genNvidia(`${genPrompt}, accurate recognizable likeness, clear silhouette`, 1);
+                  const stl2 = await scaleStlFileToHeight(r2.stlPath, targetMm, path.join(jobDir, "scaled2.stl"));
+                  const insp2 = await scoreModel(stl2, prompt, jobDir);
+                  if (insp2 && (insp2.score ?? 0) >= (insp.score ?? 0)) { r = r2; stlPath = stl2; }
+                  send({ t: ts(), kind: "tool", name: "inspect_render", status: "done", detail: `retry likeness ${insp2?.score ?? "?"}` });
+                }
+              }
+            }
+
+            const meshUrl = `/generated/${jobId}/${path.basename(stlPath)}`;
+            const glbUrl = r.glbPath ? `/generated/${jobId}/${path.basename(r.glbPath)}` : undefined;
+            send({ t: ts(), kind: "mesh", url: meshUrl, glbUrl, textured: r.textured, label: "model", stage: 1, totalStages: 1 });
+
+            // "NVIDIA + Blender": drop the mesh into the user's LIVE Blender to see/refine (when the socket's up).
+            if (r.glbPath && (await blenderLiveAvailable())) {
+              const ok = await importGlbToLive(r.glbPath);
+              if (ok) send({ t: ts(), kind: "tool", name: "repair_mesh", status: "done", detail: "opened in Blender — refine it there" });
+            }
+            await finish(stlPath, meshUrl, "nvidia", "figure ready (NVIDIA)", undefined, 1, glbUrl);
+            return;
+          } catch (nvidiaErr) {
+            // NVIDIA path failed entirely — fall through to Blender so the demo never dead-ends.
+            send({ t: ts(), kind: "tool", name: "generate_mesh", status: "warn", detail: `NVIDIA failed: ${(nvidiaErr as Error).message.slice(0, 60)} — falling back to Blender` });
+            engineName = "blender";
+            // Fall through to the Blender/OpenSCAD staged build below
           }
-          await finish(stlPath, meshUrl, "nvidia", "figure ready (NVIDIA)", undefined, 1, glbUrl);
-          return;
         }
 
         // ───────────────────────── OPENSCAD / BLENDER (staged step-by-step build) ─────────────────────────
