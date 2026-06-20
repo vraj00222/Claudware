@@ -35,6 +35,24 @@ describe("trisTo3mf", () => {
   });
 });
 
+describe("trisTo3mf with recipe", () => {
+  const recipe = {
+    layerHeight: 0.12, firstLayerHeight: 0.20, infillPercent: 15, infillPattern: "gyroid",
+    wallLoops: 2, topLayers: 7, bottomLayers: 7, supportStyle: "tree" as const,
+    supportAngle: 45, bedTemp: 55, nozzleTemp: 220, speed: 50, material: "PLA", brim: false,
+  };
+  const buf = trisTo3mf(tri2, recipe);
+  it("includes slicer config files in the 3MF", () => {
+    const s = buf.toString("latin1");
+    expect(s).toContain("plate_1.config");
+    expect(s).toContain("project_settings.config");
+    expect(s).toContain("layer_height = 0.12");
+    expect(s).toContain("sparse_infill_density = 15%");
+    expect(s).toContain("support_type = tree(auto)");
+    expect(s).toContain("wall_loops = 2");
+  });
+});
+
 describe("makeZip", () => {
   it("stores an entry's bytes verbatim at the header-computed offset", () => {
     const data = Buffer.from("hello 3mf", "utf8");

@@ -2,6 +2,7 @@ import { parseStlAuto } from "@/server/printPlan";
 import { buildPrintReadiness } from "@/server/printReady/readiness";
 import { BAMBU_A1, GENERIC_BED, type PrinterBed } from "@/server/printReady/bed";
 import { trisToObj, trisTo3mf } from "@/server/printReady/exportFormats";
+import { buildPrintRecipe } from "@/server/printReady/recipe";
 import { writeFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import type { AgentEvent, ExportFormat } from "@/lib/agentEvent";
@@ -52,18 +53,23 @@ export async function POST(req: Request) {
         const tris = parseStlAuto(await readMesh(meshUrl));
         if (!tris.length) throw new Error("couldn't read the model mesh");
 
-        // EXPORT: write OBJ + 3MF in parallel (STL already exists at meshUrl).
-        send({ t: ts(), kind: "tool", name: "export", status: "running", detail: "writing 3MF + OBJ…" });
+        // RECIPE: auto-decide print settings from geometry before export
+        send({ t: ts(), kind: "tool", name: "export", status: "running", detail: "analyzing model for optimal print settings…" });
+        const recipe = buildPrintRecipe(tris, profile);
+        send({ t: ts(), kind: "tool", name: "export", status: "done", detail: `${recipe.modelClass} → ${recipe.layerHeight}mm layers, ${recipe.infillPercent}% infill, ${recipe.supportStyle} supports` });
+
+        // EXPORT: write OBJ + 3MF (with embedded settings) in parallel (STL already exists at meshUrl).
+        send({ t: ts(), kind: "tool", name: "export", status: "running", detail: "writing 3MF (with print settings) + OBJ…" });
         await Promise.all([
           writeFile(path.join(jobDir, "model.obj"), trisToObj(tris)),
-          writeFile(path.join(jobDir, "model.3mf"), trisTo3mf(tris)),
+          writeFile(path.join(jobDir, "model.3mf"), trisTo3mf(tris, recipe)),
         ]);
         const formats: ExportFormat[] = [
           { format: "stl", url: meshUrl, label: "STL" },
           { format: "obj", url: `/generated/${jobId}/model.obj`, label: "OBJ (keeps geometry)" },
-          { format: "3mf", url: `/generated/${jobId}/model.3mf`, label: `3MF (${profile.name})` },
+          { format: "3mf", url: `/generated/${jobId}/model.3mf`, label: `3MF (${profile.name} — settings embedded, one-click print)` },
         ];
-        send({ t: ts(), kind: "tool", name: "export", status: "done", detail: "STL · OBJ · 3MF ready" });
+        send({ t: ts(), kind: "tool", name: "export", status: "done", detail: `STL · OBJ · 3MF ready — ~${recipe.estimateMinutes}min, ~${recipe.estimateGrams}g ${recipe.material}` });
 
         const readiness = buildPrintReadiness(tris, profile, formats);
         send({ t: ts(), kind: "tool", name: "validate", status: readiness.grade === "needs_work" ? "warn" : "done", detail: `readiness ${readiness.score}/100 · ${readiness.grade.replace("_", " ")} · orient: ${readiness.orientation.label}` });

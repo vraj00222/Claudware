@@ -75,6 +75,30 @@ export interface RepairAction {
   detail: string;
 }
 
+export type ModelClass = "figurine" | "functional" | "organic" | "mechanical" | "decorative";
+export type SupportStyle = "none" | "normal" | "tree";
+
+export interface PrintRecipe {
+  modelClass: ModelClass;
+  layerHeight: number;        // mm
+  firstLayerHeight: number;   // mm
+  infillPercent: number;      // 0–100
+  infillPattern: string;      // "gyroid" | "grid" | "cubic"
+  wallLoops: number;          // perimeter count
+  topLayers: number;
+  bottomLayers: number;
+  supportStyle: SupportStyle;
+  supportAngle: number;       // threshold degrees
+  bedTemp: number;            // °C
+  nozzleTemp: number;         // °C
+  speed: number;              // mm/s (outer wall)
+  material: string;           // "PLA" | "PETG" etc
+  brim: boolean;
+  estimateMinutes: number;
+  estimateGrams: number;
+  why: string;                // plain-language reason for the choices
+}
+
 export interface PrintReadiness {
   score: number;         // 0..100
   grade: "ready" | "minor" | "needs_work";
@@ -85,6 +109,7 @@ export interface PrintReadiness {
   formats: ExportFormat[];
   bed: { w: number; d: number; h: number; name: string };
   dimensions: { w: number; d: number; h: number };
+  recipe: PrintRecipe;   // auto-decided print settings (layer height, infill, supports, etc.)
   narrative: string;     // the differentiator: "here's how I'd print this and why"
 }
 

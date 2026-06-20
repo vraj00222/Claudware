@@ -7,6 +7,7 @@
 import { boundingBox, planSplit, type Tri } from "@/server/printPlan";
 import { diagnose, overhangFraction, countShells } from "./diagnose";
 import { orient } from "./orient";
+import { buildPrintRecipe } from "./recipe";
 import type { PrinterBed } from "./bed";
 import type { PrintReadiness, ExportFormat, RepairAction } from "@/lib/agentEvent";
 
@@ -43,14 +44,20 @@ export function buildPrintReadiness(tris: Tri[], bed: PrinterBed, formats: Expor
   const floaters = diag.checks.find((c) => c.id === "floaters");
   if (floaters && floaters.level !== "ok" && decompose.strategy !== "parts") repairs.push({ id: "floaters", label: "Remove stray floaters", applied: false, detail: floaters.detail });
 
-  const supportNote = frac < 0.05 ? "no supports needed" : `~${Math.max(1, Math.round(frac * 100))}% overhang → ${frac > 0.2 ? "tree supports" : "light supports"}`;
+  const recipe = buildPrintRecipe(tris, bed);
+
+  const supportNote = recipe.supportStyle === "none" ? "no supports needed"
+    : `${recipe.supportStyle} supports at ${recipe.supportAngle}°`;
   const decomposeSentence =
     decompose.strategy === "none" ? "It prints in one piece"
       : decompose.strategy === "slab" ? `It's bigger than the ${bed.name} bed, so ${decompose.reason}`
         : decompose.reason;
   const narrative =
     `Your model is ${dimensions.w}×${dimensions.d}×${dimensions.h} mm. ${orientation.why} ` +
-    `${decomposeSentence} (${supportNote}). Export as 3MF for your ${bed.name}.`;
+    `${decomposeSentence} (${supportNote}). ` +
+    `Print recipe: ${recipe.layerHeight}mm layers, ${recipe.infillPercent}% ${recipe.infillPattern} infill, ` +
+    `${recipe.wallLoops} walls, ${recipe.material} at ${recipe.nozzleTemp}°C. ` +
+    `~${recipe.estimateMinutes} min, ~${recipe.estimateGrams}g. Download the 3MF — settings are embedded, one-click print on your ${bed.name}.`;
 
   return {
     score: diag.score,
@@ -62,6 +69,7 @@ export function buildPrintReadiness(tris: Tri[], bed: PrinterBed, formats: Expor
     formats,
     bed: { w: bed.w, d: bed.d, h: bed.h, name: bed.name },
     dimensions,
+    recipe,
     narrative,
   };
 }
