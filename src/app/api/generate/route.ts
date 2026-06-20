@@ -277,15 +277,25 @@ export async function POST(req: Request) {
         if (engineName === "nvidia") {
           try {
             send({ t: ts(), kind: "tool", name: "inspect_render", status: "running", detail: refImageUrl ? "reading your reference image…" : "researching the look…" });
-            const { enrichPrompt, describeImage } = await import("@/server/promptEnrich");
+            const { enrichPrompt, describeImage, webResearchImage } = await import("@/server/promptEnrich");
             let basePrompt = prompt;
             if (refImageUrl) {
+              // Vision reads the actual pixels (TRELLIS can't), so SURFACE what Claude saw — that proves the
+              // ref image was read and makes a bad likeness self-explanatory (was silent → "NVIDIA ignored it").
               const desc = await describeImage(refImageUrl, jobDir);
               if (desc) {
                 basePrompt = `${prompt}. The reference image shows: ${desc}`;
                 send({ t: ts(), kind: "tool", name: "inspect_render", status: "done", detail: `saw in image: ${desc.slice(0, 80)}` });
               } else {
                 send({ t: ts(), kind: "tool", name: "inspect_render", status: "warn", detail: "couldn't read the reference image — using your text only" });
+              }
+            } else {
+              // No user ref image — use Browserbase to web-research a reference image of the subject,
+              // so TRELLIS gets a visual descriptor instead of just a text guess (the Tesla-robot fix).
+              const webRef = await webResearchImage(prompt, jobDir);
+              if (webRef) {
+                basePrompt = `${prompt}. Web reference shows: ${webRef.description}`;
+                send({ t: ts(), kind: "tool", name: "inspect_render", status: "done", detail: `web research: ${webRef.description.slice(0, 80)}` });
               }
             }
             const genPrompt = await enrichPrompt(basePrompt);

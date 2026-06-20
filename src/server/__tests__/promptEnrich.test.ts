@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canonicalDescriptor } from "@/server/promptEnrich";
+import { canonicalDescriptor, webResearchImage } from "@/server/promptEnrich";
 
 describe("canonicalDescriptor (named-subject stopgap)", () => {
   it("matches explicit Claude-mascot namings", () => {
@@ -18,5 +18,12 @@ describe("canonicalDescriptor (named-subject stopgap)", () => {
     for (const p of ["a dragon", "claude shannon bust", "a cowboy hat", "god of war kratos", "a coffee mug"]) {
       expect(canonicalDescriptor(p), p).toBe("");
     }
+  });
+});
+
+describe("webResearchImage", () => {
+  it("returns null when Browserbase is not configured (no API key)", async () => {
+    const result = await webResearchImage("Tesla Optimus robot", "/tmp");
+    expect(result).toBeNull();
   });
 });
