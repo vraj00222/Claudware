@@ -41,16 +41,24 @@ else:
         bpy.ops.object.mode_set(mode='OBJECT')
     except Exception as e:
         print('CLEAN_WARN', e)
-    # decimate only if very dense (keeps print + STL size reasonable)
+    # decimate only if extremely dense (preserves NVIDIA detail — the old 0.2 ratio destroyed figures)
     try:
         n = len(obj.data.polygons)
-        if n > 200000:
+        if n > 500000:
             mod = obj.modifiers.new('dec', 'DECIMATE')
-            mod.ratio = max(0.2, 150000.0 / n)
+            mod.ratio = max(0.5, 350000.0 / n)
             bpy.ops.object.modifier_apply(modifier=mod.name)
             print('DECIMATED', n, '->', len(obj.data.polygons))
     except Exception as e:
         print('DECIMATE_WARN', e)
+    # Smooth the mesh slightly to reduce staircase artifacts from TRELLIS voxel output
+    try:
+        mod_s = obj.modifiers.new('smooth', 'SMOOTH')
+        mod_s.iterations = 2
+        mod_s.factor = 0.3
+        bpy.ops.object.modifier_apply(modifier=mod_s.name)
+    except Exception as e:
+        print('SMOOTH_WARN', e)
     bpy.ops.object.select_all(action='DESELECT')
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj

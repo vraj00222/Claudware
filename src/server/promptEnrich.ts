@@ -159,16 +159,14 @@ export async function enrichPrompt(prompt: string): Promise<string> {
   const canon = canonicalDescriptor(prompt);
   if (canon) return `${canon}. ${prompt}`.slice(0, 900);
   const instruction =
-    `You are writing a prompt for a TEXT-TO-3D model generator (Microsoft TRELLIS). Turn the subject ` +
-    `below into ONE single-paragraph, comma-separated VISUAL descriptor of ~60–100 words that maximises ` +
-    `recognizable detail for a 3D-printable figurine.\n` +
-    `If the subject is a NAMED character, mascot, or franchise, describe its CANONICAL, instantly-recognizable ` +
-    `appearance accurately (correct colors, outfit, signature accessories/weapons, body type). Honor any ` +
-    `"Preferences:" already in the subject.\n` +
-    `Cover, in order: (1) what it is, (2) overall form/silhouette, (3) colors, (4) materials/surface/texture, ` +
-    `(5) distinctive features + accessories, (6) proportions, (7) pose, (8) art style. Keep it a SINGLE ` +
-    `centered object on a small flat base — no scene, no background, no lighting/camera talk, no sentences ` +
-    `about printing. Output ONLY the descriptor text.\n\nSubject: ${prompt}`;
+    `You are writing a prompt for Microsoft TRELLIS text-to-3D. Turn the subject below into a SHORT, ` +
+    `PUNCHY visual descriptor of EXACTLY 25–45 words. TRELLIS works BEST with concise prompts — ` +
+    `DO NOT exceed 50 words. Too many words = generic blob.\n` +
+    `If the subject is a NAMED character/franchise, use its CANONICAL appearance (correct colors, ` +
+    `signature features). Otherwise describe the key visual identity.\n` +
+    `Format: "[what it is], [key shape/silhouette], [2-3 distinctive features], [pose], [style], ` +
+    `on a small round base". No scene, no background, no lighting talk, no printing talk.\n` +
+    `Output ONLY the descriptor. Keep it UNDER 45 words.\n\nSubject: ${prompt}`;
   try {
     const raw = await claudeText(instruction, { maxTokens: 800, timeoutMs: 30_000 });
     const out = raw.replace(/^["']|["']$/g, "").replace(/\s+/g, " ");
