@@ -12,6 +12,12 @@ const readiness: PrintReadiness = {
   formats: [{ format: "3mf", url: "/x/model.3mf", label: "3MF" }],
   bed: { w: 256, d: 256, h: 256, name: "Bambu A1" },
   dimensions: { w: 50, d: 50, h: 50 },
+  recipe: {
+    modelClass: "functional", layerHeight: 0.20, firstLayerHeight: 0.20,
+    infillPercent: 40, infillPattern: "cubic", wallLoops: 3, topLayers: 4, bottomLayers: 4,
+    supportStyle: "none", supportAngle: 50, bedTemp: 55, nozzleTemp: 220,
+    speed: 80, material: "PLA", brim: false, estimateMinutes: 25, estimateGrams: 12, why: "functional model",
+  },
   narrative: "prints in one piece",
 };
 
