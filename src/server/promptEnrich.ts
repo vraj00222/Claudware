@@ -2,6 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { claudeText, claudeVision } from "./claude";
+import { browserbaseConfigured, bbFetch } from "./modelSearch/bb";
 
 /** Resolve a ref image (URL, /generated|/assets path, or absolute) to a readable local file. */
 async function localImagePath(ref: string, jobDir: string): Promise<string | null> {
@@ -43,6 +44,78 @@ export async function describeImage(ref: string, jobDir: string): Promise<string
     const out = (await claudeVision(instruction, [img], { maxTokens: 400, timeoutMs: 45_000 })).replace(/\s+/g, " ");
     return out.length >= 12 && !/^NO_IMAGE/i.test(out) ? out.slice(0, 700) : "";
   } catch { return ""; }
+}
+
+/**
+ * WEB RESEARCH: use Browserbase to find a reference image of the subject on the web, download it,
+ * then run Claude Vision on it to get a detailed visual descriptor. This bridges the gap for obscure/
+ * branded subjects (e.g. "Tesla Optimus robot") that TRELLIS can't generate well from text alone.
+ * Returns { imageUrl, description } or null on failure. Best-effort, never throws.
+ */
+export async function webResearchImage(
+  prompt: string,
+  jobDir: string,
+): Promise<{ imageUrl: string; description: string } | null> {
+  if (!browserbaseConfigured) return null;
+  try {
+    // Scrape a Google Images search page through Browserbase for the subject
+    const query = `${prompt} 3D reference photo`;
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&tbm=isch&udm=2`;
+    const html = await bbFetch(searchUrl, 20_000);
+
+    // Extract image URLs from the search results — Google embeds them in various data attributes
+    // and JSON blobs. We look for image URLs in common patterns.
+    const imgUrls: string[] = [];
+
+    // Pattern 1: data-src or src attributes pointing to real images (not tracking pixels/base64)
+    const srcRe = /(?:data-src|src)="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/gi;
+    let m: RegExpExecArray | null;
+    while ((m = srcRe.exec(html)) && imgUrls.length < 5) {
+      const u = m[1];
+      if (u.includes("gstatic.com/images") || u.includes("google.com/images")) continue; // skip Google UI
+      if (u.length < 20 || u.length > 2000) continue;
+      imgUrls.push(u);
+    }
+
+    // Pattern 2: URLs in JSON data blocks (Google embeds original image URLs in script tags)
+    const jsonRe = /\["(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)",\s*\d+,\s*\d+\]/gi;
+    while ((m = jsonRe.exec(html)) && imgUrls.length < 8) {
+      const u = m[1].replace(/\\u003d/gi, "=").replace(/\\u0026/gi, "&");
+      if (u.includes("gstatic.com") || u.includes("google.com/images")) continue;
+      if (u.length < 20 || u.length > 2000) continue;
+      if (!imgUrls.includes(u)) imgUrls.push(u);
+    }
+
+    if (!imgUrls.length) return null;
+
+    // Try downloading the first few images until one succeeds
+    for (const url of imgUrls.slice(0, 3)) {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 10_000);
+        try {
+          const res = await fetch(url, {
+            signal: ctrl.signal,
+            redirect: "follow",
+            headers: { "User-Agent": "Mozilla/5.0 (compatible; Claudware/1.0)" },
+          });
+          if (!res.ok) continue;
+          const ct = res.headers.get("content-type") || "";
+          if (!ct.includes("image")) continue;
+          const buf = Buffer.from(await res.arrayBuffer());
+          if (buf.length < 2000) continue; // too small to be useful
+          const ext = ct.includes("png") ? "png" : "jpg";
+          const imgPath = path.join(jobDir, `webref.${ext}`);
+          await writeFile(imgPath, buf);
+
+          // Now describe it with Claude Vision
+          const desc = await describeImage(imgPath, jobDir);
+          if (desc) return { imageUrl: url, description: desc };
+        } finally { clearTimeout(timer); }
+      } catch { continue; }
+    }
+    return null;
+  } catch { return null; }
 }
 
 /**
