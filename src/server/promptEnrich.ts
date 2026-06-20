@@ -1,13 +1,7 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
-
-const execFileP = promisify(execFile);
-const bin = (abs: string, name: string) => (existsSync(abs) ? abs : name);
-const CLAUDE = bin(path.join(os.homedir(), ".local/bin/claude"), "claude");
+import { claudeText, claudeVision } from "./claude";
 
 /** Resolve a ref image (URL, /generated|/assets path, or absolute) to a readable local file. */
 async function localImagePath(ref: string, jobDir: string): Promise<string | null> {
@@ -41,13 +35,12 @@ export async function describeImage(ref: string, jobDir: string): Promise<string
   const img = await localImagePath(ref, jobDir);
   if (!img) return "";
   const instruction =
-    `Look at the image at ${img}. Write ONE comma-separated visual descriptor (~50–90 words) of the MAIN ` +
-    `object/character for a 3D-printable figurine: what it is (name it if recognizable), overall form, ` +
+    `Write ONE comma-separated visual descriptor (~50–90 words) of the MAIN ` +
+    `object/character in this image for a 3D-printable figurine: what it is (name it if recognizable), overall form, ` +
     `colors, materials/surface, distinctive features, accessories, proportions, pose, art style. No scene ` +
     `or background. Output ONLY the descriptor; if you cannot see the image, output nothing.`;
   try {
-    const { stdout } = await execFileP(CLAUDE, ["-p", instruction], { timeout: 45_000, maxBuffer: 1 << 20 });
-    const out = stdout.trim().replace(/\s+/g, " ");
+    const out = (await claudeVision(instruction, [img], { maxTokens: 400, timeoutMs: 45_000 })).replace(/\s+/g, " ");
     return out.length >= 12 && !/^NO_IMAGE/i.test(out) ? out.slice(0, 700) : "";
   } catch { return ""; }
 }
@@ -104,8 +97,8 @@ export async function enrichPrompt(prompt: string): Promise<string> {
     `centered object on a small flat base — no scene, no background, no lighting/camera talk, no sentences ` +
     `about printing. Output ONLY the descriptor text.\n\nSubject: ${prompt}`;
   try {
-    const { stdout } = await execFileP(CLAUDE, ["-p", instruction], { timeout: 30_000, maxBuffer: 1 << 20 });
-    const out = stdout.trim().replace(/^["']|["']$/g, "").replace(/\s+/g, " ");
+    const raw = await claudeText(instruction, { maxTokens: 800, timeoutMs: 30_000 });
+    const out = raw.replace(/^["']|["']$/g, "").replace(/\s+/g, " ");
     // TRELLIS handles long prompts; cap generously so we never truncate mid-word but stay sane.
     return out.length >= 12 ? out.slice(0, 900) : prompt;
   } catch {

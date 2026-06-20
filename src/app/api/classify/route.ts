@@ -1,16 +1,9 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { existsSync } from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import { claudeText } from "@/server/claude";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const execFileP = promisify(execFile);
-const CLAUDE = existsSync(path.join(os.homedir(), ".local/bin/claude")) ? path.join(os.homedir(), ".local/bin/claude") : "claude";
-
-// Common-object keywords → a zero-cost heuristic when the CLI is slow/unavailable.
+// Common-object keywords → a zero-cost heuristic when the model call is slow/unavailable.
 const COMMON = /\b(bolt|nut|screw|washer|gear|bracket|hook|clip|knob|phone stand|stand|holder|vase|pot|box|case|benchy|whistle|fidget|spinner|keychain|hinge|handle|mount|adapter|gridfinity|pikachu|mario|dragon|figurine|miniature|dice|coaster|cable|organizer)\b/i;
 
 /** Cheap "does a ready-made version probably exist?" check for the proactive search nudge. Never blocks. */
@@ -21,12 +14,11 @@ export async function POST(req: Request) {
   // Fast heuristic first.
   if (COMMON.test(p)) return Response.json({ likely: true });
   try {
-    const { stdout } = await execFileP(
-      CLAUDE,
-      ["-p", `Is "${p}" a common, generic physical object likely to already exist on 3D-model sharing sites? Answer only yes or no.`],
-      { timeout: 9_000, maxBuffer: 1 << 16 },
+    const out = await claudeText(
+      `Is "${p}" a common, generic physical object likely to already exist on 3D-model sharing sites? Answer only yes or no.`,
+      { model: "haiku", maxTokens: 16, timeoutMs: 9_000 },
     );
-    return Response.json({ likely: /\byes\b/i.test(stdout) });
+    return Response.json({ likely: /\byes\b/i.test(out) });
   } catch {
     return Response.json({ likely: false });
   }

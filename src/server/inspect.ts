@@ -9,13 +9,12 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
+import { claudeVision } from "./claude";
 
 const execFileP = promisify(execFile);
 const bin = (abs: string, name: string) => (existsSync(abs) ? abs : name);
 const OPENSCAD = bin("/opt/homebrew/bin/openscad", "openscad");
-const CLAUDE = bin(path.join(os.homedir(), ".local/bin/claude"), "claude");
 
 export interface InspectScore { score: number | null; ok: boolean; reason: string }
 
@@ -47,12 +46,12 @@ export async function scoreModel(stlPath: string, subject: string, jobDir: strin
   const png = await renderStlPng(stlPath, path.join(jobDir, "inspect.png"));
   if (!png) return null;
   const instruction =
-    `Look at the grey 3D render at ${png}. On its own, does the SHAPE clearly read as: "${subject}"? ` +
+    `On its own, does the SHAPE in this grey 3D render clearly read as: "${subject}"? ` +
     `Judge silhouette/pose/proportions only (it is untextured). Reply with EXACTLY two lines:\n` +
     `SCORE: <number 0 to 1, where 1 = unmistakable, 0 = unrecognizable blob>\n` +
     `REASON: <one short phrase>`;
   try {
-    const { stdout } = await execFileP(CLAUDE, ["-p", instruction], { timeout: 30_000, maxBuffer: 4 << 20 });
-    return parseInspectScore(stdout, threshold);
+    const out = await claudeVision(instruction, [png], { maxTokens: 200, timeoutMs: 30_000 });
+    return parseInspectScore(out, threshold);
   } catch { return null; }
 }

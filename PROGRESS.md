@@ -6,16 +6,21 @@
   (holds a real InsForge API key). `.env.example` IS committed/public → keep it placeholder-only, NEVER paste
   real keys there (caught + reverted a real-key paste once). Security-audited: no secrets in any tracked file.
 - ANTHROPIC_API_KEY set in `.env.local` (user has API credits) → REAL generation live.
-- OpenSCAD engine FIXED + verified: (1) scad header now comments EVERY prompt line — a chosen size pref made the
-  prompt multi-line, so `Preferences: size≈medium` was landing as raw OpenSCAD → parse error → every stage
-  "Command failed". (2) The plan writer now calls the Anthropic Messages API directly via `fetch` (no new dep,
-  `src/app/api/generate/route.ts` → `claudeText()`), NOT the `claude -p` agent CLI — the CLI loaded MCP servers
-  and reasoned agentically for MINUTES, blowing past the 200s timeout → generic-block fallback. Now a real
-  6-step phone stand renders in ~30s (`6 stages · claude`, watertight · printable). Model = `claude-sonnet-4-6`
-  (env `OPENSCAD_API_MODEL`). Other engines (Blender/Fusion/NVIDIA) still use `claude -p` — migrate if slow.
-- BROWSERBASE_API_KEY in `.env.local` now has DEV-PLAN credits on its account → model search (reuse-before-
-  regenerate, sponsor #6) runs against the real Browserbase API, not just the built-in fallback library.
-- Verified: 115/115 tests green · `npm run build` clean (13 routes) · binaries present (claude, openscad, blender).
+- ★ ALL `claude -p` (agent CLI) calls REPLACED by the Anthropic Messages API (raw `fetch`, NO new dep) via a
+  shared `src/server/claude.ts` → `claudeText()` (text) + `claudeVision()` (base64 image blocks; the CLI's
+  Read tool could open a file path, the API can't). The CLI loaded MCP servers + reasoned agentically for
+  MINUTES → blew past timeouts → generic fallbacks. Migrated: generate(OpenSCAD), blender(bpy), fusion(adsk ×4),
+  classify(→haiku), clarify, promptEnrich(enrich + describe-image vision), inspect(likeness vision). Model
+  aliases resolve sonnet→claude-sonnet-4-6 / opus→claude-opus-4-8 / haiku→claude-haiku-4-5 (env-overridable).
+- OpenSCAD FIXED + verified live: also fixed a scad-header parse error (only the FIRST prompt line was
+  commented, so a multi-line size pref `Preferences: size≈medium` landed as raw OpenSCAD → every stage "Command
+  failed"). Real 6-step phone stand / 5-step soap dish render in ~30s (`N stages · claude`, watertight).
+- BROWSERBASE_API_KEY in `.env.local` now has DEV-PLAN credits → model search (reuse-before-regenerate, sponsor
+  #6) runs against the real Browserbase API, not just the built-in fallback library.
+- DEEPGRAM_API_KEY in `.env.local` updated, ~$200 credit → voice (Deepgram sponsor) runs against the real STT
+  API, not the Web Speech fallback. RESTART `npm run dev` after the env edit so the key loads.
+- Verified: 115/115 tests green · `npm run build` clean (13 routes) · OpenSCAD + classify smoke-tested live.
+  NEXT: Vraj visually tests Blender / Fusion / NVIDIA (now on the Messages API) + the voice loop.
 
 ## HOW TO CHECK THE SITE (dev)
 - Start (if not running): `npm run dev` → http://localhost:3000  (next.config rewrite needs a restart to load)

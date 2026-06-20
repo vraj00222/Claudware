@@ -15,6 +15,7 @@ import { writeFile, readFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import type { AgentEvent } from "@/lib/agentEvent";
+import { claudeText } from "@/server/claude";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,34 +25,6 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const bin = (abs: string, name: string) => (existsSync(abs) ? abs : name);
 const OPENSCAD = bin("/opt/homebrew/bin/openscad", "openscad");
-// The OpenSCAD plan is a SINGLE text-generation call — go straight to the Anthropic Messages API (fetch, no
-// new dep) instead of the `claude -p` agent CLI. The CLI loads MCP servers + reasons agentically for MINUTES
-// and blew past the 200s timeout → generic-block fallback; the raw API returns valid stages in ~10-30s.
-const OPENSCAD_API_MODEL = process.env.OPENSCAD_API_MODEL || "claude-sonnet-4-6";
-
-/** One-shot Claude text completion via the Messages API. No thinking (fast), bounded timeout, key from env. */
-async function claudeText(instruction: string, opts?: { model?: string; maxTokens?: number; timeoutMs?: number }): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), opts?.timeoutMs ?? 120_000);
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: opts?.model ?? OPENSCAD_API_MODEL, max_tokens: opts?.maxTokens ?? 12_000, messages: [{ role: "user", content: instruction }] }),
-      signal: ctrl.signal,
-    });
-    if (!res.ok) throw new Error(`Anthropic API ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
-    const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; stop_reason?: string };
-    if (data.stop_reason === "refusal") throw new Error("Claude declined the request");
-    const text = (data.content ?? []).filter((b) => b.type === "text").map((b) => b.text ?? "").join("");
-    if (!text.trim()) throw new Error("empty response from Claude");
-    return text;
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 const PUBLIC = path.join(process.cwd(), "public", "generated");
 const WATCH = path.join(process.cwd(), "tools", "_watch", "model.scad"); // open this in OpenSCAD to watch live
@@ -108,7 +81,7 @@ async function claudePlan(prompt: string, base?: string): Promise<GenPlan> {
     `non-empty. No prose, no markdown, no backticks. Begin your reply immediately with "@@@STAGE".`;
   // Single text-generation call → the Messages API directly (fetch). The `claude -p` agent CLI was loading
   // MCP servers and reasoning agentically for MINUTES on this instruction, hitting the timeout → fallback.
-  const stdout = await claudeText(instruction);
+  const stdout = await claudeText(instruction, { maxTokens: 12_000 });
 
   const stages: Stage[] = [];
   for (const part of stdout.split(/@@@STAGE\s*/g).map((s) => s.trim()).filter(Boolean)) {

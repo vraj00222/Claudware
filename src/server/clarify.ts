@@ -1,13 +1,5 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { existsSync } from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import type { PromptClass, Question } from "@/lib/clarify";
-
-const execFileP = promisify(execFile);
-const bin = (abs: string, name: string) => (existsSync(abs) ? abs : name);
-const CLAUDE = bin(path.join(os.homedir(), ".local/bin/claude"), "claude");
+import { claudeText } from "./claude";
 
 const FIGURE = /(dragon|figure|figurine|character|creature|animal|cat|dog|monster|robot|knight|warrior|anime|mascot|kratos|wolf|bird|fish|fox|bear)/i;
 const PART = /(bracket|mount|holder|clip|hook|gear|spacer|adapter|stand|case|enclosure|knob|handle|hinge)/i;
@@ -66,7 +58,7 @@ export async function claudeQuestions(prompt: string): Promise<Question[]> {
     `Q: <question> | <option1> ; <option2> ; <option3>\n` +
     `2–4 options each, most likely first. Begin immediately with "NONE" or "Q:".`;
   try {
-    const { stdout } = await execFileP(CLAUDE, ["-p", instruction], { timeout: 25_000, maxBuffer: 1 << 20 });
+    const stdout = await claudeText(instruction, { maxTokens: 400, timeoutMs: 25_000 });
     const qs: Question[] = [];
     for (const line of stdout.split("\n")) {
       const m = /^\s*Q:\s*(.+?)\s*\|\s*(.+)$/.exec(line);

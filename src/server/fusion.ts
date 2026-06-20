@@ -11,16 +11,11 @@
  * builds with cm = mm/10 and the exported STL drops straight into our mm pipeline (no rescaling, which
  * keeps Fusion's parametric precision). Verified live: a 4×3×2 cm box exports as 40×30×20 mm.
  */
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { copyFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-
-const execFileP = promisify(execFile);
-const bin = (abs: string, name: string) => (existsSync(abs) ? abs : name);
-const CLAUDE = bin(path.join(os.homedir(), ".local/bin/claude"), "claude");
+import { claudeText } from "./claude";
 
 const MCP_URL = process.env.FUSION_MCP_URL || "http://127.0.0.1:27182/mcp";
 
@@ -30,16 +25,16 @@ const MCP_URL = process.env.FUSION_MCP_URL || "http://127.0.0.1:27182/mcp";
 const FUSION_MODEL = process.env.FUSION_CLAUDE_MODEL || "sonnet";
 const FUSION_TIMEOUT_MS = Number(process.env.FUSION_CLAUDE_TIMEOUT_MS) || 200_000;
 
-type ExecErr = { killed?: boolean; signal?: string | null; code?: number | string | null; message?: string };
+type ExecErr = { killed?: boolean; signal?: string | null; code?: number | string | null; message?: string; name?: string };
 
 /**
- * Turn an execFile failure (Claude writing the adsk script) into an HONEST, actionable message —
- * the cryptic "Command failed: claude -p …" told the user nothing about WHY Fusion did nothing.
- * A timeout kills the child (killed:true / signal set / code null); a non-zero exit sets a numeric code.
+ * Turn a Claude-write failure (writing the adsk script) into an HONEST, actionable message — the cryptic
+ * "Command failed" told the user nothing about WHY Fusion did nothing. A Messages-API timeout aborts the
+ * fetch (name "AbortError"); the legacy execFile path killed the child (killed:true / signal / ETIMEDOUT).
  */
 export function describeClaudeFailure(err: ExecErr, timeoutMs = FUSION_TIMEOUT_MS): string {
   const secs = Math.round(timeoutMs / 1000);
-  if (err?.killed || err?.signal != null || err?.code === "ETIMEDOUT")
+  if (err?.killed || err?.signal != null || err?.code === "ETIMEDOUT" || err?.name === "AbortError" || /abort/i.test(err?.message || ""))
     return `the part was too complex to write in one shot — Claude ran past the ${secs}s limit. Try fewer features (ribs, patterns, fillets), a simpler part, or another engine.`;
   return `couldn't write the Fusion script: ${(err?.message || "unknown error").trim().slice(0, 140)}`;
 }
@@ -228,7 +223,7 @@ export async function claudeFusionScript(prompt: string, outPath: string, primer
   // the adsk script call ETIMEDOUT mid-write. Pin a faster model + surface an HONEST reason on timeout.
   let stdout: string;
   try {
-    ({ stdout } = await execFileP(CLAUDE, ["--model", FUSION_MODEL, "-p", instruction], { timeout: FUSION_TIMEOUT_MS, maxBuffer: 8 << 20 }));
+    stdout = await claudeText(instruction, { model: FUSION_MODEL, maxTokens: 12_000, timeoutMs: FUSION_TIMEOUT_MS });
   } catch (e) {
     throw new Error(describeClaudeFailure(e as ExecErr));
   }
@@ -265,7 +260,7 @@ export async function claudeFusionFixScript(
     `--- TRACEBACK ---\n${traceback.slice(-1200)}\n--- SCRIPT ---\n${broken}\n--- END ---`;
   let stdout: string;
   try {
-    ({ stdout } = await execFileP(CLAUDE, ["--model", FUSION_MODEL, "-p", instruction], { timeout: FUSION_TIMEOUT_MS, maxBuffer: 8 << 20 }));
+    stdout = await claudeText(instruction, { model: FUSION_MODEL, maxTokens: 12_000, timeoutMs: FUSION_TIMEOUT_MS });
   } catch (e) {
     throw new Error(describeClaudeFailure(e as ExecErr));
   }
@@ -360,7 +355,7 @@ export async function claudeFusionAssemblyScript(prompt: string, outDir: string,
     `- Output ONLY Python, beginning with "import adsk". No prose, no markdown, no backticks.`;
   let stdout: string;
   try {
-    ({ stdout } = await execFileP(CLAUDE, ["--model", FUSION_MODEL, "-p", instruction], { timeout: FUSION_TIMEOUT_MS, maxBuffer: 8 << 20 }));
+    stdout = await claudeText(instruction, { model: FUSION_MODEL, maxTokens: 12_000, timeoutMs: FUSION_TIMEOUT_MS });
   } catch (e) {
     throw new Error(describeClaudeFailure(e as ExecErr));
   }
@@ -386,7 +381,7 @@ export async function claudeFusionAssemblyFixScript(
     `--- TRACEBACK ---\n${traceback.slice(-1200)}\n--- SCRIPT ---\n${broken}\n--- END ---`;
   let stdout: string;
   try {
-    ({ stdout } = await execFileP(CLAUDE, ["--model", FUSION_MODEL, "-p", instruction], { timeout: FUSION_TIMEOUT_MS, maxBuffer: 8 << 20 }));
+    stdout = await claudeText(instruction, { model: FUSION_MODEL, maxTokens: 12_000, timeoutMs: FUSION_TIMEOUT_MS });
   } catch (e) {
     throw new Error(describeClaudeFailure(e as ExecErr));
   }

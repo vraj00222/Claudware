@@ -17,20 +17,17 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { writeFile } from "node:fs/promises";
 import { existsSync, statSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import type { GenPlan, Stage } from "./openscad";
+import { claudeText } from "./claude";
 
 const execFileP = promisify(execFile);
 const bin = (abs: string, name: string) => (existsSync(abs) ? abs : name);
 const BLENDER = bin("/opt/homebrew/bin/blender", "blender");
-const CLAUDE = bin(path.join(os.homedir(), ".local/bin/claude"), "claude");
 
-// Pin the bpy plan writer to a FASTER model (Sonnet, like OpenSCAD/Fusion). On the session-default (Opus)
-// a hard organic prompt ("a snail with a spiral shell") reasons past the 240s claude -p limit → ETIMEDOUT →
-// fallbackBpyPlan (the generic creature). This bit the FIRST generation of a session worst, because
-// /api/classify + /api/clarify fire their OWN concurrent claude -p calls at session start and starve the
-// shared CLI auth, tipping the already-slow Opus plan over the limit. Sonnet writes good bpy ~2× faster.
+// The bpy plan writer is a single text-generation call → the Anthropic Messages API (Sonnet, fast). The old
+// `claude -p` agent CLI loaded MCP servers + reasoned for minutes → blew past the 240s timeout → generic
+// fallback creature; the raw API returns valid bpy stages in ~20-60s. Env-overridable model.
 const BLENDER_MODEL = process.env.BLENDER_CLAUDE_MODEL || "sonnet";
 
 const BHOST = "127.0.0.1";
@@ -245,7 +242,7 @@ export async function claudeBpyPlan(prompt: string, base?: string, primer = ""):
     `add cameras/lights, do NOT export — that is handled for you. ` +
     `Stage 1 = rough base form, last stage = finished, recognizable model. Each stage stands alone and creates ` +
     `non-empty geometry. No prose, no markdown, no backticks. Begin your reply immediately with "@@@STAGE".`;
-  const { stdout } = await execFileP(CLAUDE, ["--model", BLENDER_MODEL, "-p", instruction], { timeout: 240_000, maxBuffer: 8 << 20 });
+  const stdout = await claudeText(instruction, { model: BLENDER_MODEL, maxTokens: 12_000, timeoutMs: 120_000 });
 
   const stages: Stage[] = [];
   for (const part of stdout.split(/@@@STAGE\s*/g).map((s) => s.trim()).filter(Boolean)) {
