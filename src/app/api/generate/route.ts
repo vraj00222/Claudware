@@ -58,27 +58,72 @@ function ensureBosl2Parts(scad: string): string {
 
 // ───────────────────────── common sense for printable design ─────────────────────────
 // Injected into BOTH OpenSCAD and Blender prompts so Claude "knows" how physical objects work.
+// This is the DESIGN INTELLIGENCE that makes our output demo-worthy: Claude acts like an
+// experienced product designer who knows how things are actually made and used.
 const COMMON_SENSE_BLOCK =
-  `\n**COMMON SENSE for real-world printable objects (MUST follow):**\n` +
-  `- KEYCHAINS: MUST have a THROUGH-HOLE (not blind/one-sided) near one end for a keyring — ` +
-  `diameter ~5-6mm, going all the way through the part. Without a through-hole it is not a keychain.\n` +
-  `- TEXT/SPELLING: When embossing or engraving text, copy the EXACT spelling from the prompt. ` +
-  `Double-check every character. "CLAUDE HARDWARE" is NOT "CLAUDWARE" or "CLUDE". Use linear_extrude ` +
-  `on text() (OpenSCAD) or bpy font objects (Blender). Make text at least 1.5mm tall and 0.8mm deep ` +
-  `so it is visible when printed. Emboss (raised) is preferred over engrave (cut) for small text.\n` +
-  `- COINS/MEDALS: Should be at least 3-4mm thick (not paper-thin). Add a raised rim/edge. ` +
-  `Text should be clearly readable — use a clean sans-serif font at adequate size.\n` +
-  `- PHONE STANDS: Must have a back support angled ~60-75° and a front lip to hold the phone. ` +
-  `Include a cable/charging slot at the bottom center (~15mm wide, ~8mm tall). ` +
-  `Make it stable (wide base, low center of gravity).\n` +
-  `- HOOKS/HANGERS: The hook opening must be large enough for its purpose (~8-12mm for keychains, ` +
-  `~25-35mm for wall hooks). Include a mounting hole or flat back for attachment.\n` +
-  `- CONTAINERS/BOXES: Wall thickness ≥1.5mm. If it has a lid, design a press-fit lip (~0.3mm clearance). ` +
-  `Rounded interior corners for easier printing.\n` +
-  `- NAMEPLATES/TAGS: Minimum 3mm thick for rigidity. Text raised ≥0.8mm or engraved ≥1mm.\n` +
-  `- GENERAL: All holes that need to go THROUGH must use difference() (OpenSCAD) or boolean DIFFERENCE ` +
-  `(Blender) — never leave them as blind pockets unless explicitly requested. Round sharp edges ` +
-  `with small fillets/chamfers (0.5-1mm) for printability and safety.\n`;
+  `\n**DESIGN INTELLIGENCE — how real-world printable objects MUST work (non-negotiable):**\n` +
+  `\n--- FUNCTIONAL FEATURES ---\n` +
+  `- KEYCHAINS/TAGS: MUST have a THROUGH-HOLE (not blind) near one end for a keyring — ` +
+  `diameter ~5-6mm, all the way through. Add rounded edges on the hole. Without a through-hole ` +
+  `it is NOT a keychain. Typical size: 50-70mm long, 25-35mm wide, 4-5mm thick.\n` +
+  `- PHONE STANDS/DOCKS: Back support angled 60-75°. Front lip ≥5mm tall to hold phone. ` +
+  `Cable/charging slot at bottom center (~15×8mm). Wide stable base (≥80mm). ` +
+  `Optional: tablet mode (steeper angle), landscape notch.\n` +
+  `- CABLE CLIPS/ORGANIZERS: Channel diameter should match cable size (USB-C ~3.5mm, Lightning ~3mm, ` +
+  `power ~6-8mm). Add a snap-fit slot (slight undercut) so cable clicks in. Wall ≥2mm.\n` +
+  `- WALL HOOKS: Hook opening 25-35mm. Mounting: either flat back with 2 screw holes (4mm dia, ` +
+  `countersunk), or a keyhole slot. Hook curve radius ≥8mm (no sharp bends). Load-bearing ` +
+  `thickness ≥4mm.\n` +
+  `- HEADPHONE STANDS: Tall enough for over-ear headphones (~200mm). Wide stable base (≥100mm). ` +
+  `Curved top cradle (~50mm wide). Optional cable-wrap hooks on the stem.\n` +
+  `- PEN/PENCIL HOLDERS: Inner diameter ≥15mm for pens, ≥12mm for pencils. Multiple holes for ` +
+  `organizer style. Wall ≥2mm. Weighted/wide base for stability.\n` +
+  `- BOOKENDS: L-shaped, heavy base (≥100×80mm), tall back (≥150mm). Wall ≥4mm for strength. ` +
+  `Anti-slip ridge on the bottom.\n` +
+  `\n--- TEXT & BRANDING ---\n` +
+  `- TEXT/SPELLING: Copy the EXACT spelling from the prompt — every single character. ` +
+  `"CLAUDE HARDWARE" is NOT "CLAUDWARE" or "CLUDE". Read the prompt again before writing text.\n` +
+  `- Use linear_extrude on text() (OpenSCAD). Make text ≥1.5mm tall and ≥0.8mm deep/raised. ` +
+  `Emboss (raised) preferred over engrave for small text — it's more visible on prints.\n` +
+  `- For logos/text on curved surfaces, project onto the surface, don't float above it.\n` +
+  `- COINS/MEDALS/TOKENS: 35-45mm diameter, 3-4mm thick. Raised rim (0.5mm). Both faces ` +
+  `can have detail. Text ≥8pt equivalent. Center the main text/logo.\n` +
+  `\n--- CONTAINERS & ENCLOSURES ---\n` +
+  `- BOXES/CONTAINERS: Wall ≥1.5mm. If it has a lid, add a press-fit lip (~0.3mm clearance ` +
+  `all around). Rounded interior corners (fillet ≥2mm) for easier printing.\n` +
+  `- VASES: Wall ≥2mm. If it should hold water, make it a SOLID shell (no infill gaps). ` +
+  `Flat stable base ≥40mm dia. Smooth interior.\n` +
+  `- PLANTERS/POTS: Drainage holes in the bottom (3-4 holes, ~5mm each). Optional saucer/tray. ` +
+  `Wall ≥2.5mm for outdoor durability.\n` +
+  `- DESK ORGANIZERS/TRAYS: Compartment walls ≥1.5mm. Slightly rounded bottoms so items ` +
+  `don't get stuck. Chamfered top edges for comfort.\n` +
+  `\n--- MECHANICAL & FUNCTIONAL ---\n` +
+  `- BRACKETS/MOUNTS: Screw holes with countersink (M3=3.2mm, M4=4.2mm, M5=5.2mm — add ` +
+  `0.2mm clearance). Fillets at stress corners ≥2mm. Minimum wall at holes ≥2× hole diameter.\n` +
+  `- HINGES/JOINTS: Print-in-place clearance 0.3-0.4mm. Pin diameter ≥3mm. ` +
+  `Knuckle wall ≥1.5mm.\n` +
+  `- SNAP-FITS: Cantilever beam thickness 1-2mm, overhang 0.3-0.5mm, ` +
+  `45° lead-in angle on the catch.\n` +
+  `- GEARS: Use BOSL2 spur_gear() for real involute profiles. Mesh clearance ` +
+  `0.1-0.2mm between teeth. Bore with keyway or D-shaft flat.\n` +
+  `- THREADED PARTS: Use BOSL2 threaded_rod()/threaded_nut(). Print clearance 0.2mm ` +
+  `on thread diameter. Vertical threads print best.\n` +
+  `\n--- DECORATIVE & FIGURES ---\n` +
+  `- FIGURINES/STATUES: Solid base ≥15mm diameter for stability. No floating parts. ` +
+  `Minimum feature size 1.5mm. Avoid extreme overhangs (≤60° from vertical).\n` +
+  `- LITHOPHANES/PHOTO FRAMES: Frame border ≥5mm. Easel back or wall-mount keyhole. ` +
+  `Stand angle ~15° back from vertical.\n` +
+  `- ORNAMENTS/DECORATIONS: Include a hanging hole or hook (3-4mm hole at top). ` +
+  `Keep weight under 50g for Christmas tree ornaments.\n` +
+  `- DESK TOYS/FIDGETS: Smooth edges everywhere (fillet ≥1mm). Moving parts need ` +
+  `0.3mm clearance. Comfortable grip size 30-50mm.\n` +
+  `\n--- UNIVERSAL RULES ---\n` +
+  `- All THROUGH-HOLES: use difference() — never blind pockets unless explicitly asked.\n` +
+  `- All sharp edges: fillet/chamfer 0.5-1mm for printability and safety.\n` +
+  `- Minimum wall: 1.2mm (nozzle-dependent). Minimum feature: 1mm.\n` +
+  `- Flat bottom for bed adhesion. Contact patch ≥8mm diameter.\n` +
+  `- No unsupported bridges longer than 20mm. No overhangs past 60° without support.\n` +
+  `- When in doubt, make it THICKER and STURDIER — thin fragile prints break.\n`;
 
 /** Ask the Claude CLI for a staged OpenSCAD plan (delimiter format, not JSON; BOSL2 available). */
 async function claudePlan(prompt: string, base?: string): Promise<GenPlan> {

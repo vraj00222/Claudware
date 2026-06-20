@@ -290,19 +290,42 @@ const PRINTABILITY_BLOCK = `
   printable, single-solid model.
 `;
 
-// Common sense rules for printable design (shared with OpenSCAD in route.ts)
+// Design intelligence for Blender bpy generation (mirrors the OpenSCAD block in route.ts).
 const BLENDER_COMMON_SENSE =
-  `\n**COMMON SENSE for real-world printable objects (MUST follow):**\n` +
-  `- KEYCHAINS: MUST have a THROUGH-HOLE near one end for a keyring (diameter ~5-6mm, all the way through). ` +
-  `Use a boolean DIFFERENCE cylinder to cut the hole. Without a through-hole it is not a keychain.\n` +
-  `- TEXT/SPELLING: Copy the EXACT spelling from the user's prompt — every character matters. ` +
-  `"CLAUDE HARDWARE" is NOT "CLAUDWARE". Use bpy font objects (bpy.data.fonts, bpy.ops.object.text_add) ` +
-  `with extrude ≥0.8mm so text is visible when printed. Convert to mesh before joining.\n` +
-  `- COINS/MEDALS: At least 3-4mm thick. Add a raised rim. Text clearly readable.\n` +
-  `- PHONE STANDS: Back support at ~60-75°, front lip, cable slot at bottom (~15mm wide).\n` +
-  `- HOOKS: Opening large enough for purpose. Mounting hole or flat back.\n` +
-  `- ALL THROUGH-HOLES: Use boolean DIFFERENCE, not just a visual indent.\n` +
-  `- Round sharp edges with bevel modifier (0.5-1mm) for printability.\n`;
+  `\n**DESIGN INTELLIGENCE — how real-world printable objects MUST work (non-negotiable):**\n` +
+  `\n--- FUNCTIONAL FEATURES ---\n` +
+  `- KEYCHAINS/TAGS: MUST have a THROUGH-HOLE near one end (5-6mm dia, all the way through). ` +
+  `Use a boolean DIFFERENCE cylinder. Without a through-hole it is NOT a keychain. ` +
+  `Size: 50-70mm long, 25-35mm wide, 4-5mm thick.\n` +
+  `- PHONE STANDS: Back support 60-75°, front lip ≥5mm, cable slot at bottom (~15×8mm), ` +
+  `wide stable base ≥80mm.\n` +
+  `- CABLE CLIPS: Channel dia to match cable (USB-C ~3.5mm, power ~6-8mm). Snap-fit slot. Wall ≥2mm.\n` +
+  `- WALL HOOKS: Opening 25-35mm, mounting with 2 screw holes (4mm dia) or keyhole. ` +
+  `Curve radius ≥8mm. Load thickness ≥4mm.\n` +
+  `- HEADPHONE STANDS: ~200mm tall, base ≥100mm, curved top cradle ~50mm. Cable-wrap hooks optional.\n` +
+  `- PEN HOLDERS: Inner dia ≥15mm, wall ≥2mm, stable weighted base.\n` +
+  `\n--- TEXT & BRANDING ---\n` +
+  `- TEXT: Copy EXACT spelling from prompt. "CLAUDE HARDWARE" ≠ "CLAUDWARE". ` +
+  `Use bpy.ops.object.text_add() with extrude ≥0.8mm. Convert to mesh before joining.\n` +
+  `- COINS/TOKENS: 35-45mm dia, 3-4mm thick, raised rim 0.5mm. Center text/logo.\n` +
+  `\n--- CONTAINERS ---\n` +
+  `- BOXES: Wall ≥1.5mm, press-fit lid lip (0.3mm clearance), rounded interior corners.\n` +
+  `- VASES: Wall ≥2mm, flat base ≥40mm, solid shell if watertight.\n` +
+  `- PLANTERS: Drainage holes (3-4 × 5mm). Wall ≥2.5mm.\n` +
+  `\n--- MECHANICAL ---\n` +
+  `- BRACKETS: Screw holes +0.2mm clearance (M3=3.2mm, M4=4.2mm). Corner fillets ≥2mm.\n` +
+  `- HINGES: Print-in-place clearance 0.3-0.4mm. Pin ≥3mm.\n` +
+  `- SNAP-FITS: Beam 1-2mm thick, overhang 0.3-0.5mm, 45° lead-in.\n` +
+  `\n--- DECORATIVE ---\n` +
+  `- FIGURINES: Solid base ≥15mm. No floating parts. Min feature 1.5mm. Overhangs ≤60°.\n` +
+  `- ORNAMENTS: Hanging hole 3-4mm at top.\n` +
+  `- DESK TOYS: Smooth edges (bevel ≥1mm). Moving parts 0.3mm clearance.\n` +
+  `\n--- UNIVERSAL RULES ---\n` +
+  `- All THROUGH-HOLES: boolean DIFFERENCE, never blind pockets unless asked.\n` +
+  `- All edges: bevel modifier 0.5-1mm for printability.\n` +
+  `- Min wall 1.2mm. Min feature 1mm. Flat bottom. Contact patch ≥8mm.\n` +
+  `- No unsupported bridges >20mm. No overhangs past 60° without support.\n` +
+  `- When in doubt: THICKER and STURDIER — thin prints break.\n`;
 
 /** Ask the Claude CLI for a staged bpy plan (arbitrary prompts; no API key). `base` = refine-in-place. */
 export async function claudeBpyPlan(prompt: string, base?: string, primer = ""): Promise<GenPlan> {
