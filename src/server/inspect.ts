@@ -11,10 +11,9 @@ import { writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { claudeVision } from "./claude";
+import { OPENSCAD_BIN as OPENSCAD } from "./bin";
 
 const execFileP = promisify(execFile);
-const bin = (abs: string, name: string) => (existsSync(abs) ? abs : name);
-const OPENSCAD = bin("/opt/homebrew/bin/openscad", "openscad");
 
 export interface InspectScore { score: number | null; ok: boolean; reason: string }
 
