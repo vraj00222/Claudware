@@ -1,7 +1,8 @@
 export type ToolName =
   | "write_openscad" | "write_blender" | "write_fusion" | "fusion_build"
   | "generate_mesh" | "repair_mesh" | "add_joints"
-  | "render_preview" | "inspect_render" | "validate" | "slice" | "export" | "send_to_printer";
+  | "render_preview" | "inspect_render" | "validate" | "slice" | "export" | "send_to_printer"
+  | "ttc_compress";
 
 export type ToolStatus = "running" | "done" | "warn" | "error";
 
