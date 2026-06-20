@@ -13,7 +13,6 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { writeFile, readFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import type { AgentEvent } from "@/lib/agentEvent";
 
@@ -25,11 +24,34 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const bin = (abs: string, name: string) => (existsSync(abs) ? abs : name);
 const OPENSCAD = bin("/opt/homebrew/bin/openscad", "openscad");
-const CLAUDE = bin(path.join(os.homedir(), ".local/bin/claude"), "claude");
-// Pin the OpenSCAD plan writer to a FASTER model (Sonnet, like Fusion) so a complex BOSL2 prompt (threaded
-// jar, multi-feature part) finishes well under the 200s claude -p limit instead of timing out → generic
-// fallback block. Sonnet writes good BOSL2; env-overridable if a heavier model is ever wanted.
-const OPENSCAD_MODEL = process.env.OPENSCAD_CLAUDE_MODEL || "sonnet";
+// The OpenSCAD plan is a SINGLE text-generation call — go straight to the Anthropic Messages API (fetch, no
+// new dep) instead of the `claude -p` agent CLI. The CLI loads MCP servers + reasons agentically for MINUTES
+// and blew past the 200s timeout → generic-block fallback; the raw API returns valid stages in ~10-30s.
+const OPENSCAD_API_MODEL = process.env.OPENSCAD_API_MODEL || "claude-sonnet-4-6";
+
+/** One-shot Claude text completion via the Messages API. No thinking (fast), bounded timeout, key from env. */
+async function claudeText(instruction: string, opts?: { model?: string; maxTokens?: number; timeoutMs?: number }): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), opts?.timeoutMs ?? 120_000);
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({ model: opts?.model ?? OPENSCAD_API_MODEL, max_tokens: opts?.maxTokens ?? 12_000, messages: [{ role: "user", content: instruction }] }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error(`Anthropic API ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+    const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; stop_reason?: string };
+    if (data.stop_reason === "refusal") throw new Error("Claude declined the request");
+    const text = (data.content ?? []).filter((b) => b.type === "text").map((b) => b.text ?? "").join("");
+    if (!text.trim()) throw new Error("empty response from Claude");
+    return text;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 const PUBLIC = path.join(process.cwd(), "public", "generated");
 const WATCH = path.join(process.cwd(), "tools", "_watch", "model.scad"); // open this in OpenSCAD to watch live
@@ -84,10 +106,9 @@ async function claudePlan(prompt: string, base?: string): Promise<GenPlan> {
     `Rules: millimetres; watertight & printable; keep $fn ≤ 64 (gears/threads render slowly otherwise); ` +
     `stage 1 = rough base, last stage = finished model; each stage's code stands alone and renders ` +
     `non-empty. No prose, no markdown, no backticks. Begin your reply immediately with "@@@STAGE".`;
-  // BOSL2 stages render slower (threads/gears) and Claude reasons longer about real mechanical parts — the
-  // old 120s ceiling occasionally timed out → fallbackPlan → a generic block instead of the bolt. Match the
-  // Blender path's headroom (200s).
-  const { stdout } = await execFileP(CLAUDE, ["--model", OPENSCAD_MODEL, "-p", instruction], { timeout: 200_000, maxBuffer: 8 << 20 });
+  // Single text-generation call → the Messages API directly (fetch). The `claude -p` agent CLI was loading
+  // MCP servers and reasoning agentically for MINUTES on this instruction, hitting the timeout → fallback.
+  const stdout = await claudeText(instruction);
 
   const stages: Stage[] = [];
   for (const part of stdout.split(/@@@STAGE\s*/g).map((s) => s.trim()).filter(Boolean)) {

@@ -1,12 +1,20 @@
 # PROGRESS — (working: `/`=landing → /app Google-gated studio (Blender DEFAULT); InsForge DB persistence; UI recolored green→terracotta; PRINT BRAIN v1 BUILT (measure W×D×H · one-piece-vs-split · supports · Download STL + landing Print Plan panel + Blender roof fix); ACCOUNT: TopBar account pill + /profile page + Sign out; MODEL SEARCH (Browserbase sponsor #6) BUILT + LIVE-VERIFIED (search Printables → import STL → Print Brain → saved); REAL MESHGEN BUILT (NVIDIA NIM TRELLIS text/image→3D, textured GLB preview in viewport + Rodin-live wired/credit-blocked) + CLARIFY-FIRST (now PROMPT-SPECIFIC via Claude: Kratos→weapon/era, not dragon) + DETAILED ENRICHMENT (Claude writes a dense structured descriptor) + REFERENCE-IMAGE UPLOAD (📎 → Claude VISION describes it → text→3D) + BLENDER AUTO-CLEANUP + NIM-mesh-imported-into-LIVE-Blender + GLB dark-render fixed + Rodin gated OFF (ENABLE_RODIN); MULTI-ENGINE: 4 SEPARATE engines + Auto routing — [Auto · OpenSCAD · Blender · Fusion · NVIDIA] picker + "Clean in Blender" combo (AgentFeed); NVIDIA disentangled from Blender (its own engine); FUSION engine LIVE via HTTP-MCP (127.0.0.1:27182, Claude→adsk→STL); TRANSPARENT failure chips (NVIDIA-broke/Blender-not-connected/Fusion-not-running shown, no silent fallback); SELF-INSPECT→retry on NVIDIA (Claude vision likeness score, bounded); skills-primers injected per engine; VISUAL-TEST RND2: OpenSCAD ✓, Fusion/Blender/Auto-OpenSCAD/NVIDIA-mascot all FAILED — symptoms point to a Claude `claude -p` USAGE-LIMIT mid-session (Blender gave identical snowman/fox = shared hardcoded fallback; OpenSCAD worked early #8 then failed late #15); RETEST RND3: claude -p healthy again (snowman ✓ distinct); FUSION "Command failed" ROOT-CAUSED+FIXED (complex adsk reasons past 200s → pinned writer to `claude --model sonnet` + honest timeout chip; bracket now writes in 136s, reaches Fusion, fails honestly at ExtrudeFeatures.add = adsk-correctness ceiling); ★NEXT-SESSION FOCUS = working/expected output: (1) NVIDIA ref-image likeness — Vraj feels "NVIDIA can't access the image" (TRUE BY DESIGN: we send Claude's TEXT desc, not pixels → real fix = image→3D); (2) Clean-in-Blender downgrade (colorless+blobby+rescaled); (3) Fusion adsk traceback-retry)
 
 ## OPS —
-- Pushed to GitHub `git@github.com:vraj00222/Claudware.git` (branch `main`, PUBLIC). All `*.md` docs gitignored
-  (local context only — NOT in repo); `.env.local` gitignored. `.env.example` IS committed/public → keep it
-  placeholder-only, NEVER paste real keys there (caught + reverted a real-key paste once).
-- ANTHROPIC_API_KEY set in `.env.local` → REAL generation live. The `claude -p` subprocess inherits Next's
-  process.env, so it bills the API key directly (not the Pro subscription). Restart `npm run dev` after env edits.
-- Security-audited the pushed repo: no secrets/tokens/hardcoded creds; all keys read from process.env.
+- Pushed to GitHub `git@github.com:vraj00222/Claudware.git` (branch `main`, PUBLIC). `*.md` context docs + source
+  + `.claude/settings.json` ARE pushed (no dates in doc bodies). KEPT OUT: `.env*`/`*.local` and `.insforge/`
+  (holds a real InsForge API key). `.env.example` IS committed/public → keep it placeholder-only, NEVER paste
+  real keys there (caught + reverted a real-key paste once). Security-audited: no secrets in any tracked file.
+- ANTHROPIC_API_KEY set in `.env.local` (user has API credits) → REAL generation live.
+- OpenSCAD engine FIXED + verified: (1) scad header now comments EVERY prompt line — a chosen size pref made the
+  prompt multi-line, so `Preferences: size≈medium` was landing as raw OpenSCAD → parse error → every stage
+  "Command failed". (2) The plan writer now calls the Anthropic Messages API directly via `fetch` (no new dep,
+  `src/app/api/generate/route.ts` → `claudeText()`), NOT the `claude -p` agent CLI — the CLI loaded MCP servers
+  and reasoned agentically for MINUTES, blowing past the 200s timeout → generic-block fallback. Now a real
+  6-step phone stand renders in ~30s (`6 stages · claude`, watertight · printable). Model = `claude-sonnet-4-6`
+  (env `OPENSCAD_API_MODEL`). Other engines (Blender/Fusion/NVIDIA) still use `claude -p` — migrate if slow.
+- BROWSERBASE_API_KEY in `.env.local` now has DEV-PLAN credits on its account → model search (reuse-before-
+  regenerate, sponsor #6) runs against the real Browserbase API, not just the built-in fallback library.
 - Verified: 115/115 tests green · `npm run build` clean (13 routes) · binaries present (claude, openscad, blender).
 
 ## HOW TO CHECK THE SITE (dev)
