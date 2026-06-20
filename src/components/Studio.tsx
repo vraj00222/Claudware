@@ -567,7 +567,7 @@ export function Studio() {
           )}
           <VersionRail current={curVersion} count={versionCount} onPick={pickVersion} />
         </div>
-        <div style={{ width: 340, flex: "none", borderLeft: "1px solid #DCD7CC", background: "#FBFAF6", display: "flex", flexDirection: "column", minHeight: 0 }}>
+        <div style={{ width: 340, flex: "none", borderLeft: "1px solid #DCD7CC", background: "#FBFAF6", display: "flex", flexDirection: "column", minHeight: 0, overflowY: "auto" }}>
           <AgentFeed rows={vm.rows} engine={engineSel} onPickEngine={(e) => { setEngineSel(e); setMode(displayMode(e)); }} cleanInBlender={cleanInBlender} onToggleClean={setCleanInBlender} miniFrame={miniFrame} />
           <PrintCenter print={vm.print} estimate={vm.estimate} rippleKey={rippleKey} onSend={sendPrint} />
           <PrintPlan plan={vm.printPlan} />
