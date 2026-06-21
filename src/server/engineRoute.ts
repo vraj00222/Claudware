@@ -27,11 +27,19 @@ const MECHANICAL =
 // Simple primitive shapes the deterministic OpenSCAD generator nails instantly.
 const SIMPLE = /\b(box|cube|block|cylinder|cup|mug|vase|bottle|bowl|plate|dish|ring|pot|tube|pipe|case|container|stand|holder|coaster|lid)\b/i;
 
+// Text / lettering / flat-decorative / turned printables → OpenSCAD. Extruded text + parametric solids are
+// fast and watertight; these used to fall through to the slow NVIDIA path (a "keychain that says HELLO" or a
+// "snowflake ornament" would spin on TRELLIS for minutes, then land as a generic block). Checked AFTER the
+// organic signal, so a "dragon keychain" still routes to NVIDIA.
+const PARAMETRIC_PRINTABLE =
+  /\b(keychain|key ?chain|keyring|key ?ring|fob|nameplate|name ?plate|badge|plaque|placard|sign|stencil|engrav(?:e|ed|ing)|emboss(?:ed|ing)?|lettering|monogram|initials|logo|cookie cutter|bookmark|ornament|snowflake|bauble|coaster|dice|domino|chess|pawn|comb|whistle|ruler|napkin ring|that says|spells?|spelling)\b/i;
+
 /** Classify a prompt to a concrete engine (never "auto"/"fusion" — those are explicit picks). */
 export function classifyEngine(prompt: string): { engine: ConcreteEngine; reason: string } {
   const p = prompt.toLowerCase();
   if (EXPLICIT_BLENDER.test(p)) return { engine: "blender", reason: "you asked to build it live in Blender" };
   if (ORGANIC.test(p)) return { engine: "nvidia", reason: "looks like a character / organic figure → NVIDIA (textured)" };
+  if (PARAMETRIC_PRINTABLE.test(p)) return { engine: "openscad", reason: "text / flat printable part → OpenSCAD" };
   if (MECHANICAL.test(p)) return { engine: "openscad", reason: "looks like a mechanical / parametric part → OpenSCAD" };
   if (SIMPLE.test(p)) return { engine: "openscad", reason: "a simple parametric shape → OpenSCAD" };
   return { engine: "nvidia", reason: "unrecognised subject → NVIDIA (a textured attempt beats a block)" };
