@@ -174,9 +174,22 @@ else:
 
 // ───────────────────────── stage wrapper (build + export) ─────────────────────────
 
+/** Deterministically fix Claude's Blender-4.x bpy so it runs on Blender 5.x (the user's 5.1.2). Claude
+ *  was trained on the old API; 5.x renamed two things that hard-crash a stage otherwise:
+ *   • boolean modifier solver enum 'FAST' was removed → use 'EXACT' (valid on BOTH 4.x and 5.x).
+ *   • uv-sphere kwarg `rings=` → `ring_count=`.
+ *  A cheap pre-pass beats a Claude self-repair round-trip for these KNOWN breakages. */
+export function sanitizeBpy(code: string): string {
+  return code
+    .replace(/(\.solver\s*=\s*)(['"])FAST\2/g, "$1'EXACT'")
+    .replace(/(solver\s*=\s*)(['"])FAST\2/g, "$1'EXACT'")
+    .replace(/([,(]\s*)rings(\s*=)/g, "$1ring_count$2");
+}
+
 /** Wrap a stage's bpy body with a clean rebuild + ASCII-STL export. Z-up matches OpenSCAD STL.
  *  `isFinal` = true for the last stage → triggers join + ground + manifold cleanup. */
 export function wrapStage(body: string, stlPath: string, isFinal = false): string {
+  body = sanitizeBpy(body);
   // JSON.stringify gives a safe single-quote-free Python string literal for the path.
   const p = JSON.stringify(stlPath);
   return `import bpy
@@ -207,13 +220,110 @@ if _nonmesh:
     except Exception as _ex:
         print('CONVERT_FAIL', _ex)
 ${isFinal ? `
-# ===== FINAL STAGE: join → ground → manifold cleanup =====
-_meshes_pre = [o for o in bpy.data.objects if o.type == 'MESH']
-if len(_meshes_pre) > 1:
+# ===== FINAL STAGE: FUSE every part into ONE connected solid → ground → cleanup =====
+# Claude often leaves AIR GAPS between parts (floating arms/head — unprintable) and/or pre-join()s
+# them into one object full of DISCONNECTED shells (join merges datablocks, it does NOT fuse gaps).
+# So: split into loose shells, MAGNETIZE each floater inward until it overlaps the body, then
+# BOOLEAN-UNION into one watertight solid. The WHOLE block is guarded and always ends by joining into
+# one object — a fuse failure can never produce "no geometry" (which would dump us to the box fallback).
+try:
+    _pre = [o for o in bpy.data.objects if o.type == 'MESH']
+    if _pre:
+        bpy.ops.object.select_all(action='DESELECT')
+        for _o in _pre:
+            _o.select_set(True)
+        bpy.context.view_layer.objects.active = _pre[0]
+        if len(_pre) > 1:
+            bpy.ops.object.join()
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.mesh.separate(type='LOOSE')
+        bpy.ops.object.mode_set(mode='OBJECT')
+        import mathutils as _mu
+        # MAGNETIZE: nudge every floater so it overlaps the biggest shell (the body) by ~2 units on
+        # whichever axis it was gapped. INLINE bbox math + explicit loops, NO nested defs/lambdas —
+        # those close over locals and silently break when the stage is exec()'d over the live socket
+        # (which is exactly why the live build came out scattered). A few passes let chained parts settle.
+        _OV = 2.0
+        for _pass in range(4):
+            _shells = [o for o in bpy.data.objects if o.type == 'MESH']
+            if len(_shells) < 2:
+                break
+            _bbx = {}
+            _body = None
+            _bestv = -1.0
+            for _o in _shells:
+                _xs = []
+                _ys = []
+                _zs = []
+                for _c in _o.bound_box:
+                    _w = _o.matrix_world @ _mu.Vector(_c)
+                    _xs.append(_w.x)
+                    _ys.append(_w.y)
+                    _zs.append(_w.z)
+                _mn = (min(_xs), min(_ys), min(_zs))
+                _mx = (max(_xs), max(_ys), max(_zs))
+                _bbx[_o.name] = (_mn, _mx)
+                _v = (_mx[0] - _mn[0]) * (_mx[1] - _mn[1]) * (_mx[2] - _mn[2])
+                if _v > _bestv:
+                    _bestv = _v
+                    _body = _o
+            _bmn, _bmx = _bbx[_body.name]
+            for _o in _shells:
+                if _o is _body:
+                    continue
+                _omn, _omx = _bbx[_o.name]
+                _d = [0.0, 0.0, 0.0]
+                for _i in range(3):
+                    if _omn[_i] > _bmx[_i] - _OV:
+                        _d[_i] = (_bmx[_i] - _OV) - _omn[_i]
+                    elif _omx[_i] < _bmn[_i] + _OV:
+                        _d[_i] = (_bmn[_i] + _OV) - _omx[_i]
+                _o.location.x += _d[0]
+                _o.location.y += _d[1]
+                _o.location.z += _d[2]
+            bpy.context.view_layer.update()
+        # BOOLEAN-UNION the now-overlapping shells into one manifold solid (guarded per part).
+        # Use the LARGEST shell (_body) as the boolean base for numerical stability.
+        _shells = [o for o in bpy.data.objects if o.type == 'MESH']
+        if len(_shells) > 1:
+            _vols = {}
+            for _o in _shells:
+                _xs2 = [(_o.matrix_world @ _mu.Vector(_c)).x for _c in _o.bound_box]
+                _ys2 = [(_o.matrix_world @ _mu.Vector(_c)).y for _c in _o.bound_box]
+                _zs2 = [(_o.matrix_world @ _mu.Vector(_c)).z for _c in _o.bound_box]
+                _vols[_o.name] = (max(_xs2)-min(_xs2))*(max(_ys2)-min(_ys2))*(max(_zs2)-min(_zs2))
+            _base = max(_shells, key=lambda _o: _vols.get(_o.name, 0))
+            for _o in [_s for _s in _shells if _s is not _base]:
+                try:
+                    _bm = _base.modifiers.new(name='fuse', type='BOOLEAN')
+                    _bm.operation = 'UNION'
+                    _bm.object = _o
+                    try:
+                        _bm.solver = 'EXACT'
+                    except Exception:
+                        pass
+                    bpy.ops.object.select_all(action='DESELECT')
+                    _base.select_set(True)
+                    bpy.context.view_layer.objects.active = _base
+                    bpy.ops.object.modifier_apply(modifier=_bm.name)
+                    bpy.data.objects.remove(_o, do_unlink=True)
+                except Exception as _bex:
+                    print('UNION_FAIL', _bex)
+except Exception as _fex:
+    print('FUSE_FAIL', _fex)
+    try:
+        bpy.ops.object.mode_set(mode='OBJECT')
+    except Exception:
+        pass
+# SAFETY: join whatever remains into ONE object so the export always sees geometry (magnetized parts
+# that the boolean couldn't fuse still overlap → slicers union them at slice time → printable).
+_left = [o for o in bpy.data.objects if o.type == 'MESH']
+if len(_left) > 1:
     bpy.ops.object.select_all(action='DESELECT')
-    for _o in _meshes_pre:
+    for _o in _left:
         _o.select_set(True)
-    bpy.context.view_layer.objects.active = _meshes_pre[0]
+    bpy.context.view_layer.objects.active = _left[0]
     bpy.ops.object.join()
 # Apply all pending transforms so geometry is in world space
 for _o in [o for o in bpy.data.objects if o.type == 'MESH']:
@@ -287,7 +397,15 @@ export async function renderStageBlender(
     } catch { /* socket hiccup → fall back to headless for this stage */ }
   }
   await writeFile(pyPath, wrapped);
-  await execFileP(BLENDER, ["--background", "--factory-startup", "--python", pyPath], { timeout: 90_000, maxBuffer: 8 << 20 });
+  try {
+    await execFileP(BLENDER, ["--background", "--factory-startup", "--python", pyPath], { timeout: 90_000, maxBuffer: 8 << 20 });
+  } catch (e) {
+    if (produced()) return "headless"; // errored after a successful export — still usable
+    // Surface the bpy TRACEBACK (Blender prints it to stderr) so the caller can self-repair the script.
+    const stderr = (e as { stderr?: string }).stderr || "";
+    const tail = (stderr || (e as Error).message || "").trim().slice(-700);
+    throw new Error(tail || "blender produced no STL (bpy error)");
+  }
   if (produced()) return "headless";
   throw new Error("blender produced no STL (empty geometry — bpy created nothing exportable)");
 }
@@ -300,16 +418,26 @@ const SCALE_HINT =
 
 const PRINTABILITY_BLOCK = `
 **PRINTABILITY (non-negotiable):**
-- The FINAL model MUST be ONE CONNECTED SOLID. After the last stage, join all mesh objects
-  with bpy.ops.object.join(). If parts overlap, use a boolean UNION (bpy.ops.object.modifier_add
-  type='BOOLEAN', operation='UNION') to fuse them. No separate floating pieces — if there is a base
-  disc or platform, it MUST be fused/intersecting with the body, NOT hovering underneath.
-- It MUST sit flat on the build plate: after joining, translate so the lowest vertex Z = 0.
-- No thin walls below ~1.2 mm at print scale. No tiny disconnected crumbs.
-- Provide a flat-ish bottom contact patch (at least ~8mm diameter) for bed adhesion.
-- Keep it watertight/manifold (no holes, no inverted faces).
+- ★★ PARTS MUST PHYSICALLY OVERLAP — this is the #1 rule. EVERY component (head, neck, arms, legs,
+  hands, feet, antenna, ears, base, ANY add-on) MUST INTERSECT the part it attaches to by AT LEAST
+  2-3 units of solid overlap. NEVER leave an air gap between two parts — a gap = a floating piece
+  that CANNOT be 3D-printed and looks broken. Concrete rules:
+    • An arm on the side of a torso must be placed so its inner edge EMBEDS INTO the torso wall
+      (overlap ≥2 units), NOT floating out to the side with a gap.
+    • The head must SINK 2-3 units into the neck/torso (or add a NECK cylinder that overlaps BOTH
+      the head and the torso). Never a head hovering above the body.
+    • Legs/feet must overlap the torso/base; a base or platform must INTERSECT the body, never hover
+      under it.
+    • If two parts would otherwise have a gap, ADD A CONNECTING piece (neck, shoulder block, strut,
+      peg) that overlaps BOTH so the whole model is ONE continuous mass of overlapping solids.
+- The FINAL model MUST be ONE CONNECTED SOLID. The post-process BOOLEAN-UNIONS every overlapping mesh
+  into a single watertight shell automatically — but the union can only fuse parts that ACTUALLY
+  OVERLAP (see above). Non-overlapping parts stay as separate floaters and ruin the print.
+- It MUST sit flat on the build plate: lowest vertex Z = 0 (handled for you — keep a flat-ish bottom).
+- No thin walls below ~1.2 mm at print scale. No tiny disconnected crumbs. Watertight/manifold.
+- Provide a flat-ish bottom contact patch (at least ~8mm) for bed adhesion.
 - Stages are CUMULATIVE — each stage adds to the previous. The last stage is the finished,
-  printable, single-solid model.
+  recognizable, printable, SINGLE-SOLID model with NO gaps between any parts.
 `;
 
 // Design intelligence for Blender bpy generation (mirrors the OpenSCAD block in route.ts).
@@ -339,7 +467,11 @@ const BLENDER_COMMON_SENSE =
   `- HINGES: Print-in-place clearance 0.3-0.4mm. Pin ≥3mm.\n` +
   `- SNAP-FITS: Beam 1-2mm thick, overhang 0.3-0.5mm, 45° lead-in.\n` +
   `\n--- DECORATIVE ---\n` +
-  `- FIGURINES: Solid base ≥15mm. No floating parts. Min feature 1.5mm. Overhangs ≤60°.\n` +
+  `- FIGURES/ROBOTS/CHARACTERS: build a clear central BODY first, then attach each limb so it OVERLAPS ` +
+  `the body by 3-4 units AT THE JOINT — arms on the upper SIDES (inner face buried in the torso wall), ` +
+  `legs UNDERNEATH, head ON TOP with its base sinking 3-4 units into the body/neck. Keep proportions ` +
+  `recognizable and distinct (clear head, body, arms, legs) — do NOT place limbs far out in empty space, ` +
+  `and do NOT make one cramped blob. Solid base ≥15mm, no floating parts, min feature 1.5mm.\n` +
   `- ORNAMENTS: Hanging hole 3-4mm at top.\n` +
   `- DESK TOYS: Smooth edges (bevel ≥1mm). Moving parts 0.3mm clearance.\n` +
   `\n--- UNIVERSAL RULES ---\n` +
@@ -365,12 +497,16 @@ export async function claudeBpyPlan(prompt: string, base?: string, primer = ""):
     `Output 3 to 4 CUMULATIVE build stages (fewer = faster). For EACH stage output exactly this, nothing else:\n` +
     `@@@STAGE <snake_case_label> | <short detail>\n` +
     `<a COMPLETE, self-contained Python (bpy) program that builds the model UP TO this stage>\n\n` +
-    `Rules: ${SCALE_HINT} Use only the \`bpy\` module (and \`math\`/\`mathutils\` if needed). ` +
-    `PREFER mesh primitives (bpy.ops.mesh.primitive_*), modifiers and boolean ops; metaballs/curves/text ` +
-    `are allowed (they're auto-converted to mesh). Keep each stage CONCISE. Do NOT clear the scene, do NOT ` +
-    `add cameras/lights, do NOT export — that is handled for you. ` +
-    `In the FINAL stage, JOIN all objects (bpy.ops.object.join()) and translate so min Z = 0.\n` +
-    `Stage 1 = rough base form, last stage = finished, recognizable, SINGLE-SOLID model sitting on Z=0. ` +
+    `Rules: ${SCALE_HINT} Use ONLY the \`bpy\` module (and \`math\`/\`mathutils\` if needed). ` +
+    `Build by ADDING SIMPLE MESH PRIMITIVES — bpy.ops.mesh.primitive_cube_add / _cylinder_add / _cone_add / ` +
+    `_uv_sphere_add — positioned so every neighbouring part OVERLAPS the part it attaches to by ≥2-3 units ` +
+    `(see PRINTABILITY). ★ CRASH-PROOF RULES (critical — Blender 5.x): do NOT use boolean modifiers, do NOT ` +
+    `call bpy.ops.object.join(), do NOT clear/delete the scene, do NOT add cameras/lights, do NOT export, and ` +
+    `capture each new object right after creating it (obj = bpy.context.active_object) rather than relying on ` +
+    `bpy.context.object later. The system AUTOMATICALLY fuses every overlapping part into ONE watertight solid, ` +
+    `grounds it at Z=0, and exports — you ONLY place overlapping primitives. metaballs/curves/text are allowed ` +
+    `(auto-converted to mesh). Keep each stage CONCISE.\n` +
+    `Stage 1 = rough base form, last stage = finished, recognizable model with ALL parts overlapping (no gaps). ` +
     `Each stage stands alone and creates non-empty geometry. No prose, no markdown, no backticks. ` +
     `Begin your reply immediately with "@@@STAGE".`;
   const stdout = await claudeText(instruction, { model: BLENDER_MODEL, maxTokens: 12_000, timeoutMs: 120_000 });

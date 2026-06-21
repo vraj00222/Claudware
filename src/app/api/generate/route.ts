@@ -1,5 +1,5 @@
 import { planOpenscad, estimateFromStl, type GenPlan, type Stage } from "@/server/openscad";
-import { claudeBpyPlan, fallbackBpyPlan, renderStageBlender, blenderLiveAvailable, importGlbToLive, cleanStlInBlender, validateStl } from "@/server/blender";
+import { claudeBpyPlan, fallbackBpyPlan, renderStageBlender, blenderLiveAvailable, importGlbToLive, cleanStlInBlender, validateStl, sanitizeBpy } from "@/server/blender";
 import { fusionAvailable, generateFusion, classifyFusionBuild, generateFusionAssembly } from "@/server/fusion";
 import { resolveEngine, type RequestedEngine, type ConcreteEngine } from "@/server/engineRoute";
 import { enginePrimer } from "@/server/skills";
@@ -188,6 +188,25 @@ async function repairOpenscad(prompt: string, brokenScad: string, errText: strin
     const out = await claudeText(instruction, { maxTokens: 8_000 });
     const scad = out.replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim();
     return scad ? ensureBosl2Parts(scad) : null;
+  } catch { return null; }
+}
+
+/** One-shot self-repair for a Blender bpy stage: feed the failed script + its traceback back to Claude
+ *  and ask for a corrected, complete program. Mirrors repairOpenscad (the constitution's "fix its own
+ *  mistakes"). Handles API drift like the invalid `rings=` kwarg on Blender 5.x. Returns null on failure. */
+async function repairBpy(prompt: string, brokenBpy: string, errText: string): Promise<string | null> {
+  const instruction =
+    `This Blender bpy program, meant to build a 3D-printable "${prompt}", FAILED with this error/traceback:\n` +
+    `${(errText || "no geometry / bpy error").slice(0, 700)}\n\n` +
+    `--- PROGRAM ---\n${brokenBpy}\n--- END ---\n\n` +
+    `Return ONLY a corrected, complete bpy program. Fix the SPECIFIC error — common causes: a wrong/renamed ` +
+    `operator keyword (e.g. bpy.ops.mesh.primitive_uv_sphere_add uses ring_count, NOT rings), a removed ` +
+    `operator, or bad kwargs. Use valid bpy for current Blender (4.x/5.x). Keep the same model and stages. ` +
+    `Do NOT clear the scene, add cameras/lights, or export — that is handled. No prose, no markdown, no backticks.`;
+  try {
+    const out = await claudeText(instruction, { model: "sonnet", maxTokens: 8_000, timeoutMs: 120_000 });
+    const code = out.replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim();
+    return code && /\bbpy\b/.test(code) ? code : null;
   } catch { return null; }
 }
 
@@ -590,7 +609,21 @@ export async function POST(req: Request) {
           let unknown: string[] = [];
           try {
             if (isBlender) {
-              await renderStageBlender(st.scad, stl, path.join(jobDir, `stage${i}.py`), live, isFinalStage);
+              const pyP = path.join(jobDir, `stage${i}.py`);
+              try {
+                await renderStageBlender(st.scad, stl, pyP, live, isFinalStage);
+              } catch (e) {
+                // Blender self-repair: feed the bpy traceback back to Claude, fix the script, and
+                // re-render once — never dead-end on a bad API call (e.g. the invalid `rings=` kwarg
+                // on Blender 5.x). Only for Claude-written plans (fallback plans are already valid).
+                if (source.startsWith("claude")) {
+                  send({ t: ts(), kind: "fix", text: `${st.label} didn't build — fixing the script…` });
+                  const fixed = await repairBpy(prompt, sanitizeBpy(st.scad), (e as Error).message);
+                  if (!fixed) throw e;
+                  await renderStageBlender(fixed, stl, pyP, live, isFinalStage);
+                  st.scad = fixed;
+                } else throw e;
+              }
               if (!existsSync(stl)) throw new Error("no geometry produced");
               // Validate STL has real geometry (not just a header / empty file)
               if (!validateStl(stl)) {

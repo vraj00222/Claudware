@@ -29,6 +29,9 @@ export function resolveModel(model?: string): string {
 // Created on first use. If TTC_API_KEY is set, wraps with compression automatically.
 
 let _client: Anthropic | (Anthropic & { compression: import("the-token-company").CompressionStats }) | undefined;
+// The un-wrapped Anthropic client, kept so a TTC-wrapped call that fails at the network layer
+// ("fetch failed") can transparently retry DIRECT instead of dumping the caller to a fallback.
+let _direct: Anthropic | undefined;
 
 async function getClient(): Promise<Anthropic> {
   if (_client) return _client;
@@ -36,6 +39,7 @@ async function getClient(): Promise<Anthropic> {
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
   const base = new Anthropic({ apiKey });
+  _direct = base;
 
   const ttcKey = process.env.TTC_API_KEY;
   if (ttcKey) {
@@ -80,48 +84,66 @@ type Opts = { model?: string; maxTokens?: number; timeoutMs?: number };
 
 async function callMessages(content: string | ContentBlock[], opts?: Opts): Promise<string> {
   const client = await getClient();
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), opts?.timeoutMs ?? 120_000);
+
+  // Build messages content in the format the SDK expects (once; reused if we retry direct).
+  const messageContent: Anthropic.MessageCreateParams["messages"][0]["content"] =
+    typeof content === "string"
+      ? content
+      : content.map((b) => {
+          if (b.type === "text") return { type: "text" as const, text: b.text };
+          return {
+            type: "image" as const,
+            source: { type: "base64" as const, media_type: b.source.media_type as "image/png" | "image/jpeg" | "image/webp" | "image/gif", data: b.source.data },
+          };
+        });
+  const createParams: Anthropic.MessageCreateParams = {
+    model: resolveModel(opts?.model),
+    max_tokens: opts?.maxTokens ?? 8_000,
+    messages: [{ role: "user", content: messageContent }],
+  };
+
+  // One create attempt on a given client, with its own timeout/abort.
+  const doCreate = async (c: Anthropic, overrideParams?: typeof createParams): Promise<string> => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), opts?.timeoutMs ?? 120_000);
+    try {
+      const response = await c.messages.create(overrideParams ?? createParams, { signal: ctrl.signal });
+      if (response.stop_reason === "refusal") throw new Error("Claude declined the request");
+      const text = response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("");
+      if (!text.trim()) throw new Error("empty response from Claude");
+      return text.trim();
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
   try {
-    // Build messages content in the format the SDK expects
-    const messageContent: Anthropic.MessageCreateParams["messages"][0]["content"] =
-      typeof content === "string"
-        ? content
-        : content.map((b) => {
-            if (b.type === "text") return { type: "text" as const, text: b.text };
-            return {
-              type: "image" as const,
-              source: { type: "base64" as const, media_type: b.source.media_type as "image/png" | "image/jpeg" | "image/webp" | "image/gif", data: b.source.data },
-            };
-          });
-
-    const response = await client.messages.create(
-      {
-        model: resolveModel(opts?.model),
-        max_tokens: opts?.maxTokens ?? 8_000,
-        messages: [{ role: "user", content: messageContent }],
-      },
-      { signal: ctrl.signal },
-    );
-
-    if (response.stop_reason === "refusal") throw new Error("Claude declined the request");
-    const text = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("");
-    if (!text.trim()) throw new Error("empty response from Claude");
-
-    // Log TTC stats after each call (if compression is active)
+    const text = await doCreate(client);
     const stats = getTtcStats();
     if (stats.enabled && stats.totalSaved > 0) {
-      console.log(
-        `[TTC] Session total: ${stats.totalSaved} tokens saved (${stats.ratio.toFixed(1)}x across ${stats.calls} calls)`
-      );
+      console.log(`[TTC] Session total: ${stats.totalSaved} tokens saved (${stats.ratio.toFixed(1)}x across ${stats.calls} calls)`);
     }
-
-    return text.trim();
-  } finally {
-    clearTimeout(timer);
+    return text;
+  } catch (e) {
+    // TTC's compression endpoint can fail at the network layer ("fetch failed") and take the whole
+    // Claude call down — which dumped generations to a generic fallback shape. If we went THROUGH the
+    // TTC wrapper, retry ONCE on the DIRECT Anthropic client so a TTC outage never breaks generation.
+    const viaTtc = !!(client as { compression?: unknown }).compression;
+    const msg = (e as Error)?.message || "";
+    const retryable = /fetch failed|network|ECONN|ETIMEDOUT|EAI_AGAIN|socket hang up|terminated|compress|token.?company|ttc/i.test(msg);
+    if (viaTtc && _direct && _direct !== client && retryable) {
+      console.warn(`[TTC] compression call failed (${msg.slice(0, 80)}) → retrying on the direct Anthropic client`);
+      const freshParams = {
+        model: createParams.model,
+        max_tokens: createParams.max_tokens,
+        messages: [{ role: "user", content: messageContent }] as typeof createParams["messages"],
+      };
+      return await doCreate(_direct, freshParams);
+    }
+    throw e;
   }
 }
 
