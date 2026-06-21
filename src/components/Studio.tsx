@@ -563,7 +563,7 @@ export function Studio() {
               <RenderLoader status={userPrompt ? "Designing your model" : "Rendering preview"} sub="generating geometry — this can take a moment" />
             </div>
           ) : (
-            <Viewport phase={vm.phase} marker={vm.marker} gizmo={vm.phase === "complete" ? "translate" : null} loaderStatus={loaderStatus} meshUrl={vm.meshUrl} glbUrl={vm.glbUrl} textured={vm.textured} />
+            <Viewport phase={vm.phase} marker={vm.marker} gizmo={vm.phase === "complete" ? "translate" : null} loaderStatus={loaderStatus} meshUrl={vm.meshUrl} glbUrl={vm.glbUrl} textured={vm.textured} supportsNeeded={vm.printPlan?.supports.needed ?? false} pillars={vm.printPlan?.supports.pillars ?? null} supportBaseZ={vm.printPlan?.supports.baseZ ?? null} />
           )}
           <VersionRail current={curVersion} count={versionCount} onPick={pickVersion} />
         </div>

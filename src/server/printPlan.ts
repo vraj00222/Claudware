@@ -4,7 +4,7 @@
  * v1 = recommend + preview only (no cutting). See:
  *   docs/superpowers/specs/2026-06-15-print-brain-v1-design.md
  */
-import type { PrintPlan } from "@/lib/agentEvent";
+import type { PrintPlan, SupportPillar } from "@/lib/agentEvent";
 
 export interface Vec3 { x: number; y: number; z: number }
 export type Tri = [Vec3, Vec3, Vec3];
@@ -97,6 +97,39 @@ export function analyzeOverhangs(tris: Tri[], coneDeg = 30): Supports {
   };
 }
 
+export interface SupportGeometry { pillars: SupportPillar[]; baseZ: number }
+
+/** WHERE supports go (the visual companion to `analyzeOverhangs`). Pure: for each steep down-facing
+ *  face above the bed, drop a vertical pillar from the model floor (min Z) up to that overhang's
+ *  underside. Overhang centroids are GRID-SNAPPED to ~`cell` mm cells (one pillar per occupied cell,
+ *  keeping the LOWEST roof — the first surface a rising support hits) so we emit a sane handful of
+ *  pillars, not one per triangle. `cap` keeps only the tallest pillars if a model has too many. */
+export function computeSupportPillars(tris: Tri[], coneDeg = 30, cell = 5, cap = 200): SupportGeometry {
+  if (!tris.length) return { pillars: [], baseZ: 0 };
+  const cos = Math.cos((coneDeg * Math.PI) / 180);
+  let minZ = Infinity, maxZ = -Infinity;
+  for (const t of tris) for (const v of t) { if (v.z < minZ) minZ = v.z; if (v.z > maxZ) maxZ = v.z; }
+  const eps = Math.max(0.5, (maxZ - minZ) * 0.01); // bed-contact band (matches analyzeOverhangs)
+  const grid = new Map<string, SupportPillar>();
+  for (const t of tris) {
+    const n = faceNormal(t);
+    const cz = (t[0].z + t[1].z + t[2].z) / 3;
+    if (-n.z > cos && cz > minZ + eps) { // steep downward AND above the plate → needs a support
+      const cx = (t[0].x + t[1].x + t[2].x) / 3;
+      const cy = (t[0].y + t[1].y + t[2].y) / 3;
+      const gx = Math.round(cx / cell) * cell;
+      const gy = Math.round(cy / cell) * cell;
+      const key = `${gx}:${gy}`;
+      const cur = grid.get(key);
+      if (!cur || cz < cur.topZ) grid.set(key, { x: gx, y: gy, topZ: cz });
+    }
+  }
+  let pillars = [...grid.values()];
+  if (pillars.length > cap) pillars = pillars.sort((a, b) => b.topZ - a.topZ).slice(0, cap);
+  pillars = pillars.map((p) => ({ x: round1(p.x), y: round1(p.y), topZ: round1(p.topZ) }));
+  return { pillars, baseZ: round1(minZ) };
+}
+
 export interface Bed { w: number; d: number; h: number; name: string }
 export const DEFAULT_BED: Bed = { w: 220, d: 220, h: 250, name: "Generic 220×220×250" };
 
@@ -149,7 +182,13 @@ export function buildPrintPlanFromTris(
 ): PrintPlan {
   const bbox = boundingBox(tris);
   const split = planSplit(bbox, bed);
-  const supports = analyzeOverhangs(tris);
+  const overhangs = analyzeOverhangs(tris);
+  // Only carry pillar geometry when supports are actually needed → the viewport overlay has nothing
+  // to draw otherwise, and the field stays absent (back-compatible) for support-free models.
+  const geom = overhangs.needed ? computeSupportPillars(tris) : null;
+  const supports = geom
+    ? { ...overhangs, pillars: geom.pillars, baseZ: geom.baseZ }
+    : overhangs;
   return {
     dimensions: { w: round1(bbox.w), d: round1(bbox.d), h: round1(bbox.h) },
     bed: { w: bed.w, d: bed.d, h: bed.h, name: bed.name },
