@@ -21,6 +21,12 @@ export function TopBar({ stages, printerStatus, onNewChat, user }: { stages: Sta
       >
         Projects
       </a>
+      <a
+        href="/showcase"
+        style={{ flex: "none", display: "flex", alignItems: "center", height: 30, padding: "0 13px", borderRadius: 9999, border: "1px solid #C9C3B6", background: "#FBFAF6", color: "#232019", textDecoration: "none", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600 }}
+      >
+        Showcase
+      </a>
       <StageTracker stages={stages} />
       <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6E6A60" }}>
         <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#cc785c", animation: "hwpulsedot 2.4s ease-in-out infinite" }} />
