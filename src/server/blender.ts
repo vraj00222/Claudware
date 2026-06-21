@@ -183,7 +183,7 @@ export function sanitizeBpy(code: string): string {
   return code
     .replace(/(\.solver\s*=\s*)(['"])FAST\2/g, "$1'EXACT'")
     .replace(/(solver\s*=\s*)(['"])FAST\2/g, "$1'EXACT'")
-    .replace(/\brings(\s*=)/g, "ring_count$1");
+    .replace(/([,(]\s*)rings(\s*=)/g, "$1ring_count$2");
 }
 
 /** Wrap a stage's bpy body with a clean rebuild + ASCII-STL export. Z-up matches OpenSCAD STL.
@@ -284,10 +284,17 @@ try:
                 _o.location.z += _d[2]
             bpy.context.view_layer.update()
         # BOOLEAN-UNION the now-overlapping shells into one manifold solid (guarded per part).
+        # Use the LARGEST shell (_body) as the boolean base for numerical stability.
         _shells = [o for o in bpy.data.objects if o.type == 'MESH']
         if len(_shells) > 1:
-            _base = _shells[0]
-            for _o in _shells[1:]:
+            _vols = {}
+            for _o in _shells:
+                _xs2 = [(_o.matrix_world @ _mu.Vector(_c)).x for _c in _o.bound_box]
+                _ys2 = [(_o.matrix_world @ _mu.Vector(_c)).y for _c in _o.bound_box]
+                _zs2 = [(_o.matrix_world @ _mu.Vector(_c)).z for _c in _o.bound_box]
+                _vols[_o.name] = (max(_xs2)-min(_xs2))*(max(_ys2)-min(_ys2))*(max(_zs2)-min(_zs2))
+            _base = max(_shells, key=lambda _o: _vols.get(_o.name, 0))
+            for _o in [_s for _s in _shells if _s is not _base]:
                 try:
                     _bm = _base.modifiers.new(name='fuse', type='BOOLEAN')
                     _bm.operation = 'UNION'

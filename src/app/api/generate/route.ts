@@ -1,5 +1,5 @@
 import { planOpenscad, estimateFromStl, type GenPlan, type Stage } from "@/server/openscad";
-import { claudeBpyPlan, fallbackBpyPlan, renderStageBlender, blenderLiveAvailable, importGlbToLive, cleanStlInBlender, validateStl } from "@/server/blender";
+import { claudeBpyPlan, fallbackBpyPlan, renderStageBlender, blenderLiveAvailable, importGlbToLive, cleanStlInBlender, validateStl, sanitizeBpy } from "@/server/blender";
 import { fusionAvailable, generateFusion, classifyFusionBuild, generateFusionAssembly } from "@/server/fusion";
 import { resolveEngine, type RequestedEngine, type ConcreteEngine } from "@/server/engineRoute";
 import { enginePrimer } from "@/server/skills";
@@ -618,7 +618,7 @@ export async function POST(req: Request) {
                 // on Blender 5.x). Only for Claude-written plans (fallback plans are already valid).
                 if (source.startsWith("claude")) {
                   send({ t: ts(), kind: "fix", text: `${st.label} didn't build — fixing the script…` });
-                  const fixed = await repairBpy(prompt, st.scad, (e as Error).message);
+                  const fixed = await repairBpy(prompt, sanitizeBpy(st.scad), (e as Error).message);
                   if (!fixed) throw e;
                   await renderStageBlender(fixed, stl, pyP, live, isFinalStage);
                   st.scad = fixed;

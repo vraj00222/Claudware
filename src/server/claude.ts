@@ -103,11 +103,11 @@ async function callMessages(content: string | ContentBlock[], opts?: Opts): Prom
   };
 
   // One create attempt on a given client, with its own timeout/abort.
-  const doCreate = async (c: Anthropic): Promise<string> => {
+  const doCreate = async (c: Anthropic, overrideParams?: typeof createParams): Promise<string> => {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), opts?.timeoutMs ?? 120_000);
     try {
-      const response = await c.messages.create(createParams, { signal: ctrl.signal });
+      const response = await c.messages.create(overrideParams ?? createParams, { signal: ctrl.signal });
       if (response.stop_reason === "refusal") throw new Error("Claude declined the request");
       const text = response.content
         .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -133,10 +133,15 @@ async function callMessages(content: string | ContentBlock[], opts?: Opts): Prom
     // TTC wrapper, retry ONCE on the DIRECT Anthropic client so a TTC outage never breaks generation.
     const viaTtc = !!(client as { compression?: unknown }).compression;
     const msg = (e as Error)?.message || "";
-    const retryable = /fetch failed|fetch|network|ECONN|ETIMEDOUT|EAI_AGAIN|socket|terminated|compress|token.?company|ttc/i.test(msg);
+    const retryable = /fetch failed|network|ECONN|ETIMEDOUT|EAI_AGAIN|socket hang up|terminated|compress|token.?company|ttc/i.test(msg);
     if (viaTtc && _direct && _direct !== client && retryable) {
       console.warn(`[TTC] compression call failed (${msg.slice(0, 80)}) → retrying on the direct Anthropic client`);
-      return await doCreate(_direct);
+      const freshParams = {
+        model: createParams.model,
+        max_tokens: createParams.max_tokens,
+        messages: [{ role: "user", content: messageContent }] as typeof createParams["messages"],
+      };
+      return await doCreate(_direct, freshParams);
     }
     throw e;
   }
