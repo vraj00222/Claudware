@@ -15,7 +15,7 @@ import { writeFile, readFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import type { AgentEvent } from "@/lib/agentEvent";
-import { claudeText } from "@/server/claude";
+import { claudeText, getTtcStats } from "@/server/claude";
 import { OPENSCAD_BIN as OPENSCAD } from "@/server/bin";
 
 export const runtime = "nodejs";
@@ -252,6 +252,12 @@ export async function POST(req: Request) {
           durableUrl = await uploadFinalStl(jobId, stlPath);
           try { send({ t: ts(), kind: "printplan", plan: buildPrintPlan(stl, DEFAULT_BED, { stlUrl: meshUrl, storageUrl: durableUrl }) }); } catch { /* best-effort */ }
         } catch { /* never break a good generation */ }
+        // TTC compression stats chip (sponsor visibility — only shown when TTC is active)
+        const ttcStats = getTtcStats();
+        if (ttcStats.enabled && ttcStats.totalSaved > 0) {
+          send({ t: ts(), kind: "tool", name: "ttc_compress", status: "done",
+            detail: `Token Company: ${ttcStats.totalSaved} tokens saved (${ttcStats.ratio.toFixed(1)}x compression across ${ttcStats.calls} calls)` });
+        }
         send({ t: ts(), kind: "summary", text: summaryText, source, engine: engineName, meshUrl: durableUrl, ...(parts && parts.length ? { parts } : {}) });
       }
 
