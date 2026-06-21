@@ -63,9 +63,9 @@ export interface OrientationPlan {
 }
 
 export interface ExportFormat {
-  format: "stl" | "obj" | "3mf";
+  format: "stl" | "obj" | "3mf" | "gcode";  // "gcode" = real slicer output (PrusaSlicer), additive
   url: string;
-  label: string;         // "STL", "OBJ (keeps color)", "3MF (Bambu A1)"
+  label: string;         // "STL", "OBJ (keeps color)", "3MF (Bambu A1)", "G-code (real slice)"
   bytes?: number;
 }
 

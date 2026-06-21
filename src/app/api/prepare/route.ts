@@ -3,7 +3,9 @@ import { buildPrintReadiness } from "@/server/printReady/readiness";
 import { BAMBU_A1, GENERIC_BED, type PrinterBed } from "@/server/printReady/bed";
 import { trisToObj, trisTo3mf } from "@/server/printReady/exportFormats";
 import { buildPrintRecipe } from "@/server/printReady/recipe";
-import { writeFile, mkdir, readFile } from "node:fs/promises";
+import { sliceStl, slicerAvailable } from "@/server/slicer";
+import type { EstimateOverride } from "@/server/printReady/readiness";
+import { writeFile, mkdir, readFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { AgentEvent, ExportFormat } from "@/lib/agentEvent";
 
@@ -50,7 +52,8 @@ export async function POST(req: Request) {
         await mkdir(jobDir, { recursive: true });
 
         send({ t: ts(), kind: "tool", name: "validate", status: "running", detail: "checking walls · holes · overhangs · orientation…" });
-        const tris = parseStlAuto(await readMesh(meshUrl));
+        const meshBytes = await readMesh(meshUrl);
+        const tris = parseStlAuto(meshBytes);
         if (!tris.length) throw new Error("couldn't read the model mesh");
 
         // RECIPE: auto-decide print settings from geometry before export
@@ -69,9 +72,35 @@ export async function POST(req: Request) {
           { format: "obj", url: `/generated/${jobId}/model.obj`, label: "OBJ (keeps geometry)" },
           { format: "3mf", url: `/generated/${jobId}/model.3mf`, label: `3MF (${profile.name} — settings embedded, one-click print)` },
         ];
-        send({ t: ts(), kind: "tool", name: "export", status: "done", detail: `STL · OBJ · 3MF ready — ~${recipe.estimateMinutes}min, ~${recipe.estimateGrams}g ${recipe.material}` });
 
-        const readiness = buildPrintReadiness(tris, profile, formats);
+        // REAL SLICE (binary/flag-gated, graceful fallback): when a slicer CLI is installed, produce
+        // ACTUAL G-code — real supports, real slice time, real filament usage — and offer it as a
+        // download. When absent, this whole block is skipped and the heuristic path below is unchanged.
+        let estimateOverride: EstimateOverride | undefined;
+        if (slicerAvailable()) {
+          send({ t: ts(), kind: "tool", name: "slice", status: "running", detail: "slicing model (real supports + G-code)…" });
+          const stlInput = path.join(jobDir, "input.stl");
+          await writeFile(stlInput, meshBytes);
+          const sliced = await sliceStl(stlInput, recipe, profile, { outPath: path.join(jobDir, "model.gcode"), timeoutMs: 120_000 });
+          await unlink(stlInput).catch(() => {}); // clean up the temp slice input
+          if (sliced.ok && sliced.gcodePath) {
+            const mins = sliced.estimateMinutes ?? recipe.estimateMinutes;
+            const grams = sliced.filamentGrams ?? recipe.estimateGrams;
+            estimateOverride = { minutes: mins, grams };
+            formats.push({ format: "gcode", url: `/generated/${jobId}/model.gcode`, label: `G-code (${profile.name} — real slice)` });
+            const sup = sliced.supportsUsed ? `${recipe.supportStyle} supports` : "no supports";
+            send({ t: ts(), kind: "tool", name: "slice", status: "done", detail: `real slice: ~${mins}min, ~${grams}g ${recipe.material} · ${sup}` });
+          } else {
+            send({ t: ts(), kind: "tool", name: "slice", status: "warn", detail: `slicer unavailable — using estimate (${sliced.error ?? "no output"})` });
+          }
+        }
+
+        const exportDetail = estimateOverride
+          ? `STL · OBJ · 3MF · G-code ready — ~${estimateOverride.minutes}min, ~${estimateOverride.grams}g ${recipe.material} (real slice)`
+          : `STL · OBJ · 3MF ready — ~${recipe.estimateMinutes}min, ~${recipe.estimateGrams}g ${recipe.material}`;
+        send({ t: ts(), kind: "tool", name: "export", status: "done", detail: exportDetail });
+
+        const readiness = buildPrintReadiness(tris, profile, formats, estimateOverride);
         send({ t: ts(), kind: "tool", name: "validate", status: readiness.grade === "needs_work" ? "warn" : "done", detail: `readiness ${readiness.score}/100 · ${readiness.grade.replace("_", " ")} · orient: ${readiness.orientation.label}` });
         send({ t: ts(), kind: "printready", readiness });
         send({ t: ts(), kind: "summary", text: readiness.narrative });
