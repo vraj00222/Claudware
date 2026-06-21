@@ -597,7 +597,7 @@ export function Studio() {
         <div style={{ width: 340, flex: "none", borderLeft: "1px solid #DCD7CC", background: "#FBFAF6", display: "flex", flexDirection: "column", minHeight: 0, overflowY: "auto" }}>
           <AgentFeed rows={vm.rows} engine={engineSel} onPickEngine={(e) => { setEngineSel(e); setMode(displayMode(e)); }} cleanInBlender={cleanInBlender} onToggleClean={setCleanInBlender} miniFrame={miniFrame} />
           <PrintCenter print={vm.print} estimate={vm.estimate} rippleKey={rippleKey} onSend={sendPrint} />
-          <PrintPlan plan={vm.printPlan} />
+          <PrintPlan plan={vm.printPlan} modelName={userPrompt} />
           <PrintPartsPanel
             split={vm.split}
             canSplit={vm.phase === "complete" && !!vm.meshUrl}
@@ -605,6 +605,7 @@ export function Studio() {
             view={splitView}
             onSplit={splitForPrint}
             onSetView={setSplitView}
+            modelName={userPrompt}
           />
           <PrintReadyPanel
             readiness={vm.readiness}
@@ -612,6 +613,7 @@ export function Studio() {
             canPrepare={vm.phase === "complete" && !!vm.meshUrl}
             preparing={preparing}
             onPrepare={prepareForPrint}
+            modelName={userPrompt}
           />
         </div>
       </div>

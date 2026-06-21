@@ -2,6 +2,7 @@
 import { LAND, LAND_FONT } from "@/design/tokens";
 import { useState } from "react";
 import type { SplitResult } from "@/lib/agentEvent";
+import { modelSlug } from "@/lib/fileName";
 
 /**
  * Print-in-parts panel — the "print version" surface: split a model into printable pieces joined by
@@ -24,7 +25,7 @@ function Seg({ active, onClick, children }: { active: boolean; onClick: () => vo
 }
 
 export function PrintPartsPanel({
-  split, canSplit, splitting, view, onSplit, onSetView,
+  split, canSplit, splitting, view, onSplit, onSetView, modelName,
 }: {
   split: SplitResult | null;
   canSplit: boolean;
@@ -32,6 +33,7 @@ export function PrintPartsPanel({
   view: "whole" | "parts";
   onSplit: (parts: number) => void;
   onSetView: (v: "whole" | "parts") => void;
+  modelName?: string | null;
 }) {
   const [count, setCount] = useState(3);
   if (!split && !canSplit) return null;
@@ -79,7 +81,7 @@ export function PrintPartsPanel({
           {/* per-part downloads */}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {split.parts.map((p) => (
-              <a key={p.index} href={p.url} download style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: LAND.ink2, textDecoration: "none", borderBottom: `1px solid ${LAND.border}`, paddingBottom: 5 }}>
+              <a key={p.index} href={p.url} download={`${modelSlug(modelName)}-${modelSlug(p.label, `part-${p.index + 1}`)}.stl`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: LAND.ink2, textDecoration: "none", borderBottom: `1px solid ${LAND.border}`, paddingBottom: 5 }}>
                 <span>{p.label} <span style={{ fontFamily: LAND_FONT.mono, color: LAND.ink3 }}>{p.w}×{p.d}×{p.h}</span></span>
                 <span style={{ color: LAND.accent, fontSize: 11 }}>download STL ↓</span>
               </a>
