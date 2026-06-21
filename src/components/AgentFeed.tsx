@@ -21,7 +21,7 @@ function glyphColor(kind: FeedRow["kind"]): string {
 
 const MONO = "'JetBrains Mono', monospace";
 const ENGINES: [RequestEngine, string][] = [
-  ["auto", "Auto"], ["openscad", "OpenSCAD"], ["blender", "Blender"], ["fusion", "Fusion"], ["nvidia", "NVIDIA"],
+  ["auto", "Auto"], ["openscad", "DIY"], ["blender", "Quick Shape"], ["fusion", "Pro Mechanical"], ["nvidia", "Premium 3D"],
 ];
 
 export function AgentFeed({ rows, engine, onPickEngine, cleanInBlender, onToggleClean, miniFrame }: {
@@ -44,7 +44,7 @@ export function AgentFeed({ rows, engine, onPickEngine, cleanInBlender, onToggle
         <span style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: ".14em", color: "#A6A095" }}>AGENT ACTIVITY</span>
         {/* engine picker — Auto routes per prompt; or force OpenSCAD/Blender/Fusion/NVIDIA. Always visible. */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-          <div title="Engine — Auto picks per prompt · OpenSCAD/Fusion: precise parametric · Blender: live procedural build · NVIDIA: organic figures (textured)" style={{ display: "flex", flexWrap: "wrap", background: "#F0ECE3", border: "1px solid #C9C3B6", borderRadius: 9999, padding: 2, fontFamily: MONO, fontSize: 9.5, gap: 2 }}>
+          <div title="Engine — Auto picks per prompt · DIY: maker parts, gears & bolts · Quick Shape: fast procedural models · Pro Mechanical: precision CAD for big parts · Premium 3D: rich textured figurines with color" style={{ display: "flex", flexWrap: "wrap", background: "#F0ECE3", border: "1px solid #C9C3B6", borderRadius: 9999, padding: 2, fontFamily: MONO, fontSize: 9.5, gap: 2 }}>
             {ENGINES.map(([e, label]) => {
               const on = engine === e;
               return (
