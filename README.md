@@ -6,7 +6,7 @@ Claude Hardware is an AI-powered 3D printing design studio. Describe any object 
 
 The barrier to 3D printing isn't the printer — it's design expertise. We supply it.
 
-> Built with Claude Code during [Cal Hacks](https://calhacks.io/) 2026. Track: Lab.
+> Built with Claude Code during CAL AI HACKATHON 2026. Track: Lab.
 
 ---
 
