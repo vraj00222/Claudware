@@ -31,6 +31,19 @@ describe("classifyEngine", () => {
     expect(classifyEngine("a 50mm box").engine).toBe("openscad");
   });
 
+  it("routes text / lettering / flat-decorative printables to OpenSCAD (not slow NVIDIA)", () => {
+    expect(classifyEngine("a keychain that says HELLO").engine).toBe("openscad");
+    expect(classifyEngine("a snowflake ornament").engine).toBe("openscad");
+    expect(classifyEngine("a chess pawn").engine).toBe("openscad");
+    expect(classifyEngine("a nameplate with my initials").engine).toBe("openscad");
+    expect(classifyEngine("a cookie cutter shaped like a star").engine).toBe("openscad");
+  });
+
+  it("keeps an organic subject on NVIDIA even with a flat-printable word", () => {
+    // 'keychain' would pull this to OpenSCAD — the character signal must win.
+    expect(classifyEngine("a dragon keychain").engine).toBe("nvidia");
+  });
+
   it("routes explicit 'in blender' / 'watch it build' to Blender", () => {
     expect(classifyEngine("watch a small rocket build in blender").engine).toBe("blender");
     expect(classifyEngine("build a tree in blender").engine).toBe("blender");
