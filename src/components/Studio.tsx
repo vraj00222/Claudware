@@ -570,13 +570,14 @@ export function Studio() {
         <div style={{ width: 340, flex: "none", borderLeft: "1px solid #DCD7CC", background: "#FBFAF6", display: "flex", flexDirection: "column", minHeight: 0, overflowY: "auto" }}>
           <AgentFeed rows={vm.rows} engine={engineSel} onPickEngine={(e) => { setEngineSel(e); setMode(displayMode(e)); }} cleanInBlender={cleanInBlender} onToggleClean={setCleanInBlender} miniFrame={miniFrame} />
           <PrintCenter print={vm.print} estimate={vm.estimate} rippleKey={rippleKey} onSend={sendPrint} />
-          <PrintPlan plan={vm.printPlan} />
+          <PrintPlan plan={vm.printPlan} modelName={userPrompt} />
           <PrintReadyPanel
             readiness={vm.readiness}
             parts={projectRef.current?.versions[curVersion]?.parts ?? null}
             canPrepare={vm.phase === "complete" && !!vm.meshUrl}
             preparing={preparing}
             onPrepare={prepareForPrint}
+            modelName={userPrompt}
           />
         </div>
       </div>

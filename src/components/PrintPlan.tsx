@@ -1,6 +1,7 @@
 "use client";
 import { LAND, LAND_FONT } from "@/design/tokens";
 import type { PrintPlan as Plan } from "@/lib/agentEvent";
+import { modelFileName } from "@/lib/fileName";
 
 /**
  * Print Plan panel — the Print Brain readout (landing-page style, per Vraj's design call).
@@ -12,7 +13,7 @@ const eyebrow: React.CSSProperties = {
   textTransform: "uppercase", color: LAND.accent, marginBottom: 10,
 };
 
-export function PrintPlan({ plan }: { plan: Plan | null }) {
+export function PrintPlan({ plan, modelName }: { plan: Plan | null; modelName?: string | null }) {
   if (!plan) return null;
   const d = plan.dimensions;
   const split = plan.recommendation === "split";
@@ -46,7 +47,7 @@ export function PrintPlan({ plan }: { plan: Plan | null }) {
         {plan.supports.reason}
       </div>
 
-      <a href={dl} download
+      <a href={dl} download={modelFileName(modelName, "stl")}
         style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", height: 44, borderRadius: 8,
           background: LAND.accent, color: "#fff", textDecoration: "none", fontWeight: 500, fontSize: 14 }}>
         Download STL
