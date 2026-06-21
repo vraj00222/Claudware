@@ -119,11 +119,63 @@ export async function webResearchImage(
 }
 
 /**
+ * Outfit / accessory composition for the mascot: when the user dresses Clawd up (e.g. "claude code
+ * mascot in a cowboy hat", "Clawd as a wizard"), append a concrete description of the costume so the
+ * generated figure actually wears it instead of dropping the modifier. Returns a leading ", …" clause
+ * or "" when nothing matches. Themed outfits come first; loose accessories are added on top so
+ * "cowboy Clawd with sunglasses" composes. Pure + deterministic.
+ */
+export function outfitClause(p: string): string {
+  const themed: { re: RegExp; desc: string }[] = [
+    { re: /\b(cowboy|cowgirl|wild west|rodeo|sheriff|ranch)\b/, desc: "a brown cowboy hat and a red bandana around its neck, with tiny cowboy boots" },
+    { re: /\b(wizard|mage|sorcerer|magician|gandalf)\b/, desc: "a tall pointed wizard hat and a flowing robe, holding a small magic staff" },
+    { re: /\b(santa|christmas|xmas|father christmas)\b/, desc: "a red Santa hat with a white fluffy pom-pom" },
+    { re: /\bpirate\b/, desc: "a black pirate tricorn hat and an eyepatch" },
+    { re: /\b(superhero|super hero|caped hero)\b/, desc: "a small flowing cape and a domino eye mask" },
+    { re: /\b(astronaut|space ?suit|spaceman|cosmonaut)\b/, desc: "a rounded astronaut helmet and a puffy white space suit" },
+    { re: /\bninja\b/, desc: "a ninja mask and headband" },
+    { re: /\b(chef|cook|baker)\b/, desc: "a tall white chef's toque hat and a little apron" },
+    { re: /\b(graduat|mortarboard|grad cap)\w*\b/, desc: "a graduation mortarboard cap with a hanging tassel" },
+    { re: /\b(king|queen|royal|crown|prince|princess)\b/, desc: "a small golden crown" },
+    { re: /\bparty\b/, desc: "a striped cone party hat" },
+    { re: /\b(detective|sherlock)\b/, desc: "a checked deerstalker detective hat" },
+    { re: /\bviking\b/, desc: "a horned viking helmet" },
+    { re: /\bsamurai\b/, desc: "a samurai kabuto helmet" },
+    { re: /\b(doctor|surgeon)\b/, desc: "a white lab coat and a head mirror" },
+    { re: /\b(witch)\b/, desc: "a black pointed witch hat" },
+  ];
+  const loose: { re: RegExp; desc: string }[] = [
+    { re: /\b(sunglasses|shades)\b/, desc: "cool dark sunglasses" },
+    { re: /\b(glasses|spectacles|nerd)\b/, desc: "round glasses" },
+    { re: /\b(top hat|tophat)\b/, desc: "a tiny black top hat" },
+    { re: /\b(baseball cap|ball cap|snapback)\b/, desc: "a backwards baseball cap" },
+    { re: /\bbeanie\b/, desc: "a knitted beanie" },
+    { re: /\b(scarf|muffler)\b/, desc: "a cozy knitted scarf" },
+    { re: /\b(bow ?tie)\b/, desc: "a little bow tie" },
+    { re: /\b(headphones|headset)\b/, desc: "over-ear headphones" },
+    { re: /\b(cape|cloak)\b/, desc: "a small flowing cape" },
+    { re: /\bbackpack\b/, desc: "a tiny backpack" },
+    { re: /\bmustache|moustache\b/, desc: "a curly mustache" },
+    { re: /\b(hat|cap)\b/, desc: "a little hat" },
+  ];
+  const parts: string[] = [];
+  let matchedThemed = false;
+  for (const o of themed) if (o.re.test(p)) { parts.push(o.desc); matchedThemed = true; break; }
+  for (const o of loose) {
+    if (parts.length >= 3) break;
+    // Skip the generic "hat"/"cap" catch-all if a themed outfit (which already implies headwear) matched.
+    if (matchedThemed && /\bhat|cap\b/.test(o.re.source)) continue;
+    if (o.re.test(p)) parts.push(o.desc);
+  }
+  return parts.length ? `, wearing ${parts.join(" and ")}` : "";
+}
+
+/**
  * STOPGAP canonical descriptors for named subjects that free TEXT→3D otherwise reinvents generically
  * (TRELLIS never sees reference pixels — NVIDIA's hosted image→3D 500s — so likeness is only as good as
  * the words we feed it). When the user explicitly NAMES such a subject (e.g. "the Claude Code mascot"),
- * we substitute a hand-written canonical descriptor so the result is on-brand instead of a random figure.
- * Returns "" when nothing matches. Pure + deterministic → unit-testable, and skips a Claude round-trip.
+ * we substitute a hand-written canonical descriptor (+ any outfit) so the result is on-brand instead of
+ * a random figure. Returns "" when nothing matches. Pure + deterministic → unit-testable.
  */
 export function canonicalDescriptor(prompt: string): string {
   const p = prompt.toLowerCase();
@@ -134,12 +186,13 @@ export function canonicalDescriptor(prompt: string): string {
     /\bmascot\b[^.]{0,24}\b(claude|anthropic)\b/.test(p) ||
     /\bclaude\s*code\s*mascot\b/.test(p);
   if (isClawd) {
-    return (
-      "Clawd, the Claude AI mascot, a cute chibi character with a single rounded teardrop / soft-blob body " +
-      "in warm coral-orange (#cc785c), smooth matte surface, a simple friendly face with two small round dot " +
-      "eyes and no nose or mouth, short stubby arms, no legs, sitting upright centered on a small flat circular " +
-      "base, big-headed minimalist kawaii mascot proportions, clean rounded silhouette, soft toy-like style"
-    );
+    const base =
+      "Clawd, the official Claude (Anthropic) AI mascot: a cute rounded chibi character in warm coral-orange " +
+      "(#cc785c) with a smooth matte finish, its head built from the Anthropic spark — a friendly radiating " +
+      "sunburst with soft rounded petals/rays — a simple kind face with two small black dot eyes and no nose " +
+      "or mouth, short stubby arms and little rounded feet, big-headed minimalist kawaii proportions, clean " +
+      "rounded silhouette, soft toy-like style";
+    return `${base}${outfitClause(p)}, standing upright centered on a small flat round base`;
   }
   return "";
 }
