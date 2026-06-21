@@ -26,6 +26,7 @@ export const dynamic = "force-dynamic";
 const execFileP = promisify(execFile);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const EST_TOKENS_PER_REUSE = 12_000; // representative design-pass output budget saved per cache reuse
 const PUBLIC = path.join(process.cwd(), "public", "generated");
 const WATCH = path.join(process.cwd(), "tools", "_watch", "model.scad"); // open this in OpenSCAD to watch live
 const OPENSCAD_LIBS = path.join(process.cwd(), "tools", "openscad-libs"); // BOSL2 (real gears/threads)
@@ -303,8 +304,8 @@ export async function POST(req: Request) {
             servedFromCache = true;
             await replayCached(cached, exact ? "exact" : "semantic", semantic?.score, semantic?.matchedPrompt);
             await bumpStat(exact ? "cacheHits" : "semanticHits");
-            // a Claude design call (~12k max tokens) avoided when the cached recipe came from Claude
-            await bumpStat("tokensSaved", cached.source?.startsWith("claude") ? 12_000 : 0);
+            // each reuse avoids the design pass (a Claude script call, ~12k max output tokens)
+            await bumpStat("tokensSaved", EST_TOKENS_PER_REUSE);
             await recordTurn(sessionId, { prompt, engine: cached.engine, meshUrl: cached.mesh.url, served: exact ? "exact-cache" : "semantic-cache", ts: Date.now() });
             controller.close();
             return;
