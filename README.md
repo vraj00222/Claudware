@@ -36,6 +36,7 @@ Plus **Clean in Blender** (post-step) and **Model Search** (find existing models
 | Sponsor | What it powers |
 |---------|---------------|
 | **Anthropic** (Claude) | The brain — designs, classifies, clarifies, self-inspects, fixes |
+| **Arize AX** | LLM observability — traces every Claude call, generation pipeline spans, LLM-as-judge evaluator |
 | **Deepgram** | Voice input — speak your idea instead of typing |
 | **NVIDIA NIM** | TRELLIS text-to-3D for textured organic models |
 | **Redis** | Semantic generation cache + vector search + agent memory |
@@ -95,6 +96,8 @@ Copy `.env.example` to `.env.local` and fill in:
 | `BROWSERBASE_API_KEY` | For live model search | Browserbase API key |
 | `BROWSERBASE_PROJECT_ID` | For model search | Browserbase project ID |
 | `TTC_API_KEY` | For token savings | The Token Company API key |
+| `ARIZE_SPACE_ID` | For LLM tracing | Arize AX Space ID (from app.arize.com settings) |
+| `ARIZE_API_KEY` | For LLM tracing | Arize AX API Key |
 | `NEXT_PUBLIC_INSFORGE_URL` | For auth + persistence | InsForge project URL (browser) |
 | `NEXT_PUBLIC_INSFORGE_ANON_KEY` | For auth + persistence | InsForge anon key (browser) |
 | `INSFORGE_URL` | For server storage | InsForge URL (server-only) |
