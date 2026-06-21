@@ -700,6 +700,40 @@ P3. Prompt refinement — add the useful context / strip noise per engine. (Open
 6. LANDING SHOWCASE (ROADMAP): app-made models (printer/dragon GLBs saved) assembling w/ color — "made by the app".
 7. Then Redis/Sentry/Arize + deeper printability intelligence. ROADMAP. (Hunyuan3D dropped — committed to NVIDIA NIM.)
 
+## POLISH + DOCS SESSION — end-to-end engine testing, comprehensive docs, screenshots
+
+### Engine test results (all verified via curl + browser)
+- **OpenSCAD** "a simple phone stand" → 6 stages, watertight, cable slot, 49s
+- **OpenSCAD** "M10 hex bolt with threads" → real BOSL2 threaded_rod, 3 stages, 17mm AF, 27s
+- **Blender** "a tiny rocket ship" → 3 stages, fins+nozzles+nose, 63s, 68mm
+- **NVIDIA** "a chubby sitting dragon" → TRELLIS text→3D (NIM endpoint busy → procedural fallback, 103s)
+- **Auto routing** "a cute anime cat figurine" → correctly routes to NVIDIA
+- **Model search** "benchy" → curated 3DBenchy + live Printables results
+- **Classify** "a cute cat figurine" → {"likely":true}
+- **Prepare** STL → score 80/100, 4 checks, auto-orient, STL/OBJ/3MF/G-code (real PrusaSlicer slice)
+
+### Browser visual verification
+- Landing page → warm "Hardware Paper" design, animated, 3D printer illustration
+- Auth gate → Google sign-in + "continue without signing in"
+- Studio → 5-engine picker, example prompts, model search, Bambu A1 online
+- ClarifyCard → prompt-specific questions (dragon: style/wings/size)
+- NVIDIA generation → live agent feed, textured model in viewport
+- OpenSCAD bolt → threaded bolt with BOSL2, visible threads in viewport
+- Print Readiness → 65/100 score, 4 checks, auto-orient, STL/OBJ/3MF/G-code downloads
+
+### Docs created/updated
+- **README.md** — comprehensive (setup, engines, sponsors, architecture, testing, design system)
+- **DEMO.md** — expanded with best prompts per engine, 5 demo beats, do-not-break list
+- **.env.example** — organized by category with all keys documented
+- **docs/SETUP.md** — cross-platform (Ubuntu + macOS), troubleshooting table
+- **docs/ROADMAP.md** — reorganized (working today vs near-term vs sponsors)
+
+### Stats
+- 130 source files, ~11,760 lines of TypeScript
+- 40 test files, 216 tests passing
+- 13 routes, clean build
+- 7 sponsor integrations (all key-gated, all with fallbacks)
+
 ## CUT (decided — do not revisit)
 - ~~multi-engine picker UI · Fusion~~ → REVERSED (Vraj installed Fusion + wants all engines
   selectable). Now BUILT: 4-engine picker + Auto + Fusion engine. FreeCAD/Tinkercad still cut.

@@ -1,41 +1,78 @@
-# SETUP — Claude Hardware (macOS / Apple Silicon)
+# SETUP
 
-## Verified installed
-| Tool | Version | Notes |
-|---|---|---|
-| Python 3.11 | 3.11.15 | REQUIRED for bpy — build venv against this, not system 3.14 |
-| OpenSCAD (snapshot) | 2026.06.10 | Manifold backend. CLI: /Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD |
-| OrcaSlicer | installed | CLI: /Applications/OrcaSlicer.app/Contents/MacOS/OrcaSlicer |
-| Bambu Studio | installed | likely the venue printer brand |
-| Blender | 5.1.2 | desktop (visual debugging); bpy via pip is the headless engine |
-| Redis | 8.8.0 | `redis-server` to run, or use Docker |
-| Node / npm | v25.6.1 / 11.9.0 | works (Current, not LTS) |
-| Docker | 29.3.1 | Redis fallback |
-| Claude Code | 2.1.177 | |
-| bpy / trimesh / manifold3d | 5.0.1 / 4.12.2 / ok | import-verified on Python 3.11 (airplane test passed) |
+## Prerequisites
 
-## Remaining hour-0 steps (not yet done)
-1. Scaffold the app (and decide frontend integration — see ARCHITECTURE.md):
-   npx create-next-app@latest . --typescript --tailwind --app --eslint
-   npm i three @react-three/fiber @react-three/drei \
-         @anthropic-ai/claude-agent-sdk @modelcontextprotocol/sdk redis zod
-2. Project python venv (MUST be 3.11):
-   python3.11 -m venv .venv && source .venv/bin/activate
-   pip install bpy trimesh manifold3d
-3. Fonts (self-host for the offline demo — design uses Space Grotesk + JetBrains Mono):
-   download .woff2 → public/fonts/, wire in globals.css (no CDN in the demo)
-4. Services: `redis-server` (or `docker run -p 6379:6379 redis:alpine`)
-5. Secrets: secrets go in `.env.local` (gitignored); `.env.example` is the committed template.
-   Keys: Anthropic · Deepgram · mesh-gen · Redis URL · InsForge (URL/anon + server URL/API key) ·
-   **Browserbase** (`BROWSERBASE_API_KEY` [+ `BROWSERBASE_PROJECT_ID`]) for model search.
-   NOTE: adding/changing env vars requires a `npm run dev` RESTART for Next to load them.
+| Tool | Required? | Install |
+|------|-----------|---------|
+| Node.js 20+ | Yes | `nvm install 20` or [nodejs.org](https://nodejs.org) |
+| OpenSCAD | For parametric engine | `apt install openscad` / `brew install openscad` |
+| Blender 3.x+ | For organic engine | `apt install blender` / `brew install blender` |
+| PrusaSlicer | For real G-code slicing | `apt install prusa-slicer` / `brew install prusaslicer` |
 
-## macOS gotchas
-- Filesystem is case-insensitive: DESIGN.md and design.md alias. The Trunk
-  landing system was moved to docs/landing-trunk-design.md to free DESIGN.md.
-- openscad / orcaslicer are NOT on PATH from cask installs — use the full
-  /Applications/.../MacOS/... paths (or alias them) in subprocess calls.
+## Quick setup
 
-## Preview the design bundle
-Open frontend/Claude Hardware.dc.html in a browser, or:
-   cd frontend && python3 -m http.server 8080   # → http://localhost:8080
+```bash
+# 1. Clone
+git clone https://github.com/vraj00222/Claudware.git
+cd Claudware
+
+# 2. Install Node dependencies
+npm install
+
+# 3. Environment
+cp .env.example .env.local
+# Fill in API keys — see README.md "Environment variables"
+# The app works with ZERO keys (deterministic fallbacks)
+
+# 4. BOSL2 for OpenSCAD mechanical parts (gears, threads, bearings)
+git clone https://github.com/BelfrySCAD/BOSL2.git tools/openscad-libs/BOSL2
+
+# 5. Build + verify
+npm run build    # Should show 13 routes, no errors
+npm test         # 216 tests should pass
+
+# 6. Run
+npm run dev      # → http://localhost:3000
+```
+
+## Ubuntu / Debian (CI / Devin)
+
+```bash
+sudo apt-get update -qq
+sudo apt-get install -y openscad blender prusa-slicer python3-numpy
+```
+
+## macOS
+
+```bash
+brew install openscad blender prusaslicer
+```
+
+Note: Homebrew cask apps aren't on PATH — the app auto-detects them at:
+- `/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD`
+- `/Applications/PrusaSlicer.app/Contents/MacOS/PrusaSlicer`
+
+## Optional: live CAD sync
+
+### OpenSCAD live preview
+Open `tools/_watch/model.scad` in OpenSCAD → Design → Automatic Reload and Preview.
+The same build appears stage-by-stage in the native app as the agent writes it.
+
+### Blender live build
+Open Blender → N-panel → BlenderMCP → Connect (socket 9876).
+Claude builds the model in your Blender window in real time.
+
+### Fusion 360
+Start the Fusion HTTP MCP on `127.0.0.1:27182`.
+Claude writes `adsk` scripts and you watch them build in Fusion.
+
+## Troubleshooting
+
+| Issue | Fix |
+|-------|-----|
+| `openscad: command not found` | Install it or set `OPENSCAD_BIN` in `.env.local` |
+| `blender: command not found` | Install it — headless fallback still works |
+| Models come out as generic blocks | Check `ANTHROPIC_API_KEY` is set + restart `npm run dev` |
+| NVIDIA shows "procedural fallback" | Normal when Blender isn't running for GLB→STL; or NIM endpoint is slow |
+| "Command failed" on complex parts | Claude hit the timeout — try a simpler prompt or run one at a time |
+| Env vars not loading | Restart `npm run dev` after editing `.env.local` |
