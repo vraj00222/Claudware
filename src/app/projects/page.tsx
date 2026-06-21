@@ -8,6 +8,11 @@ const fmtDate = (t: number) =>
   " · " +
   new Date(t).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
+// Demo: only surface projects generated on Jun 20–21, 2026 (today + tomorrow); hide older clutter.
+const DEMO_FROM = new Date(2026, 5, 20).getTime(); // Jun 20, 2026 00:00 local
+const DEMO_TO = new Date(2026, 5, 22).getTime();   // Jun 22, 2026 00:00 local (exclusive)
+const inDemoWindow = (t: number) => t >= DEMO_FROM && t < DEMO_TO;
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -15,7 +20,8 @@ export default function ProjectsPage() {
 
   const refresh = useCallback(async () => {
     if (!storeRef.current) storeRef.current = await getActiveStore();
-    setProjects(await storeRef.current.list());
+    const all = await storeRef.current.list();
+    setProjects(all.filter((p) => inDemoWindow(p.createdAt)));
     setLoaded(true);
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
