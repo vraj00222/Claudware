@@ -43,6 +43,34 @@
   (intermittently slow/erroring server-side — outside our code). OPEN Q for Vraj: change unknown→default from
   NVIDIA to OpenSCAD given endpoint flakiness?
 
+## BLENDER 5.x COMPAT + PRINTABLE-FUSE SESSION (Vraj on Blender 5.1.2; "robot not shown / gaps / fix all & print")
+ROOT CAUSES (systematic-debugging, all curl/headless-verified): (a) Claude writes Blender-4.x bpy →
+`mod.solver='FAST'` + `primitive_uv_sphere_add(rings=…)` HARD-CRASH on Blender 5.1.2 (FAST→FLOAT/EXACT, rings→
+ring_count) → every stage throws → 0 STLs → route falls to the OpenSCAD box fallback (the "box instead of my
+model" + "built in Blender but app shows a box"); (b) `bpy.ops.object.join()` merges datablocks but does NOT
+fuse non-touching shells → floating arms/head = the "gaps, can't 3D-print"; (c) my first fuse used nested
+def/lambda that lose scope under the live BlenderMCP socket's `exec()` → fused headless but came out SCATTERED
+live; (d) TTC compression (now active in main) + Anthropic rate-limit (from heavy testing) throw "fetch failed"
+→ claudeBpyPlan throws → generic fallback creature.
+- [x] `sanitizeBpy` (blender.ts) — deterministic 4.x→5.x rewrite: `solver='FAST'`→`'EXACT'`, `rings=`→`ring_count=`.
+      Applied in wrapStage (live + headless). Verified: the crashing stage0 → STL_OK.
+- [x] PROMPT RULES (claudeBpyPlan) — emit ONLY simple OVERLAPPING primitives; do NOT join()/boolean/clear-scene/
+      rely on context.object (the 5.x crash sources) — the system fuses/grounds/exports. + figure/robot limb-
+      attachment guidance (arms on sides, legs under, head sinks in; overlap 3-4u; no far-floating, no blob).
+- [x] PRINTABLE FUSE (wrapStage final stage) — split into LOOSE shells → MAGNETIZE each floater inward until it
+      overlaps the body → BOOLEAN-UNION (EXACT) → ONE watertight solid; fully guarded + always join-for-export
+      (a fuse failure can't produce "no geometry"). Rewritten EXEC-SAFE (inline loops, no nested def/lambda) so it
+      fuses on the live socket too. Verified: 11-floater robot → ONE_SOLID_PRINTABLE; live build now 1 solid.
+- [x] BLENDER SELF-REPAIR (route.ts repairBpy) — feed a failed bpy traceback back to Claude (sonnet) → re-render
+      once (mirrors OpenSCAD PR #12). renderStageBlender now surfaces the headless stderr traceback to the caller.
+- [x] TTC RESILIENCE (claude.ts) — keep the un-wrapped client; a TTC-wrapped call that fails ("fetch failed",
+      network) retries ONCE on the DIRECT Anthropic client so a TTC outage never dumps generation to a fallback.
+- VERIFIED: tsc clean · 216 tests green · multiple robots generate as `claude` plans → ONE connected printable
+  solid (e.g. public/generated/mqnneu7v/stage2.stl, app-made, no manual edits). KNOWN: heavy testing RATE-LIMITED
+  the Anthropic API → temporary "fetch failed"→fallback for ALL engines (recovers on cooldown, NOT a code bug).
+  Procedural robot LOOK still varies run-to-run (magnetize trades aesthetics for guaranteed connectivity) →
+  generate a few & pick, or iterate in-app. NEXT: cool-down → clean robot batch → slice → PRINT the demo keepsake.
+
 ## FEATURE SESSION (mascot likeness · slicer · supports viz · split-for-print) — all merged to main
 - [x] PR #16 — MASCOT LIKENESS: `canonicalDescriptor()` now an on-brand Claude/Clawd identity (coral teardrop +
       Anthropic sunburst) + `outfitClause()` deterministically composes outfits ("claude code mascot in a cowboy
