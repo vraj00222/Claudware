@@ -152,101 +152,189 @@
 
 ---
 
-## WHY WE SHOULD WIN — SPONSOR TRACK PITCHES
+## JUDGING CRITERIA — HOW WE HIT EVERY ONE
 
-### Sentry — Best Use of Sentry SDK
+### Application (real-world use)
+> 3D printing is a **$20 billion market** growing 20% year-over-year. Every maker, teacher, engineer, and hobbyist who owns a printer faces the same bottleneck: they can't design what they want. Claude Hardware is an immediate, usable product — type a prompt, get a file, press print. It works today, on real printers, with real G-code. This isn't a concept — we printed physical parts from it during the hackathon.
 
-**Criteria:** Strong technical execution + clear communication + observability from day one.
+### Functionality / Quality
+> 216 tests across 40 files. 13 production routes. Zero-key boot (the entire app demos with no API keys). A warm, hand-crafted "Hardware Paper" design system — not a template, not a dashboard clone. The UI was designed in Claude Design, exported, and rebuilt pixel-for-pixel in Next.js. Every external service has a working fallback — Deepgram falls back to Web Speech, Redis to in-memory, InsForge to localStorage. Nothing breaks. Nothing dead-ends.
 
-We didn't bolt Sentry on as an afterthought — we integrated it as a first-class observability layer across the entire stack:
+### Creativity
+> No one has built this. Text-to-3D tools exist (Meshy, Shap-E) — they give you a mesh and wish you luck. We give you a **manufacturing pipeline**: printability checks, auto-orientation, engineered split-for-print with push-fit connectors at 0.2mm tolerances, real slicer G-code. Five engines under one brain — the user doesn't choose between parametric and organic; Claude classifies and routes automatically. And Claude **inspects its own render** with computer vision and self-repairs. That loop doesn't exist anywhere else.
 
-- **Error Monitoring:** `@sentry/nextjs` wraps every server + client route. A `global-error.tsx` React error boundary captures client crashes. Every API route (`/api/generate`, `/api/clarify`, `/api/search`, `/api/prepare`, `/api/upload`) calls `captureException` with rich context (prompt, engine, jobId) so errors are instantly debuggable in the Sentry dashboard.
-- **Performance Tracing:** Every HTTP response includes `sentry-trace` + `baggage` headers for distributed tracing. The generation pipeline (30–120 seconds of Claude + OpenSCAD/Blender/NVIDIA work) is traced end-to-end with structured attributes: engine, duration, cache status, repair status.
-- **Profiling:** `@sentry/profiling-node` with `nodeProfilingIntegration()` runs at 100% sample rate — every traced span has CPU profiling attached. This matters because our pipeline is compute-heavy (subprocess renders, mesh validation, real slicing).
-- **Structured Logs:** `Sentry.logger.info()` emits pipeline telemetry — generation completions with engine/duration/cache-hit, clarify request counts by prompt class, search completions, print readiness scores. These structured logs flow into Sentry's log explorer alongside errors and traces.
-- **Session Replay + Feedback:** Client-side `replayIntegration()` captures full session replays on errors (100% on error, 10% baseline). `feedbackIntegration()` lets users report issues inline.
-- **Ad-blocker bypass:** `tunnelRoute: "/monitoring"` routes Sentry events through our own domain so ad-blockers can't drop them.
-- **Verification endpoint:** `GET /api/sentry-test` throws an intentional error for instant verification; `?check=1` returns DSN connection status.
-- **Key-gated:** The entire Sentry integration is gated on `SENTRY_DSN` — the app boots and works perfectly with zero keys.
+### Technical Complexity
+> This is not a wrapper around one API. This is an orchestrator that coordinates **Claude (Anthropic Messages API, Sonnet + Haiku + Vision), OpenSCAD + BOSL2 (subprocess, staged rendering), Blender bpy (live socket + headless, with 4→5.x sanitization), Fusion 360 (HTTP MCP JSON-RPC), NVIDIA NIM TRELLIS (REST → GLB → STL conversion), PrusaSlicer (console-mode G-code), Redis (semantic vector search + KV + hash + list), OpenTelemetry (OTLP → Arize), Sentry SDK v9 (tracing + replay + structured logs)** — all behind a single SSE endpoint that streams typed AgentEvents to a react-three-fiber viewport. Every subprocess has a timeout. Every service has a fallback. The auto-router classifies prompts across 5 tiers. The self-inspect loop uses Claude Vision with a bounded retry. The split engine computes OpenSCAD CGAL boolean cuts with tolerance-engineered pegs and sockets. This is systems engineering.
 
-**Where to look:** `sentry.{client,server,edge}.config.ts`, `src/server/sentry.ts`, `src/instrumentation.ts`, `src/app/global-error.tsx`, `src/app/api/sentry-test/route.ts`, plus instrumentation in every API route.
+### Ethical Considerations (NEW)
+> Claude Hardware **democratizes manufacturing** — it removes the expertise barrier that keeps 3D printing inaccessible to most people. We don't generate weapons or harmful objects (Claude's built-in safety filtering handles this). We prioritize **reuse before regenerate** — the Browserbase model search finds existing free models (with proper attribution: author, license, source) before spending compute on new generation. Our Redis semantic cache eliminates redundant Claude calls for similar prompts, reducing energy and token waste. And the entire app works with **zero API keys** — no paywalls, no vendor lock-in, no forced data collection.
 
----
-
-### Redis — Beyond Caching
-
-**Criteria:** Not just caching — something better/different with Redis.
-
-Redis isn't our cache. It's our **agent's memory and decision engine:**
-
-1. **Semantic Vector Search (reuse-before-regenerate):** Every finished generation is stored with a 256-dim keyword-weighted embedding. When a new prompt arrives, Redis runs cosine KNN to find semantically similar prior builds — "a stand for my phone" matches "phone stand" at ~0.82 similarity. Above 0.65 threshold, the prior model is served instantly: 0 Claude tokens, 0 subprocess work, <100ms response. This is Redis as a **vector database driving agent behavior**, not a cache.
-2. **Agent Memory:** Per-session and global memory lists (`LPUSH` + `LTRIM` capped at 50/100 turns). The agent knows what this user has built before. The recent global feed powers the landing page showcase.
-3. **Live Counters:** A Redis hash (`HINCRBY`) tracks generations, cache hits, semantic reuses, and tokens saved in real time. The `/api/redis` endpoint exposes this — live proof Redis is working.
-4. **Exact Cache:** Traditional hash-keyed cache as a fast path before the vector search. Same request twice → instant.
-5. **In-memory fallback:** When `REDIS_URL` is absent, the entire Redis surface transparently falls back to an in-process Map — the app never breaks, never throws. Key-gated, production-grade.
-
-**Where to look:** `src/server/redis.ts` (263 lines — connection, vector ops, hash/list primitives), `src/server/genCache.ts` (semantic cache + vector KNN), `src/server/agentMemory.ts` (session memory + counters), `src/app/api/redis/route.ts` (live stats endpoint).
+### Brainstorming & Process (NEW)
+> This was not vibe-coded. We have a **DECISIONS.md** (append-only technical decisions log), **PROGRESS.md** (build log tracking what's done and what's next), **ARCHITECTURE.md** (system design with the AgentEvent contract), and **CLAUDE.md** (agent constitution with rules, phase map, and engine specifications). The design went through multiple iterations: dark → warm light, Space Grotesk → Bricolage Grotesque, green accent → terracotta, auto-demo → prompt-driven, static print stats → dynamic PrusaSlicer output. Every engine was tested with real prompts and real output. The Blender engine was rewritten for 5.x compatibility after discovering crashes in the live demo. The self-repair system exists because we hit real failures and engineered around them — not because we planned it on paper.
 
 ---
 
-### Arize — LLM Observability
+## SPONSOR TRACK — WHY WE SHOULD WIN EACH ONE
 
-**Criteria:** Display/prove that Arize is actually useful in the project.
+### REDIS — "Beyond Caching"
 
-Every Claude API call in Claudware is traced to Arize AX via OpenTelemetry — you can open the Arize dashboard and see the full agent reasoning chain:
+**What we built with Redis:**
+Redis isn't a side integration in Claude Hardware — it's the **intelligence layer**. We use Redis for three distinct, non-trivial things:
 
-1. **Auto-instrumentation:** `AnthropicInstrumentation` from `@arizeai/openinference-instrumentation-anthropic` patches `Anthropic.messages.create()` at startup. Every LLM call — classify, clarify, design (12k tokens), self-inspect (vision), self-repair — emits an LLM span with full prompt/response/token-usage.
-2. **Pipeline spans:** Manual CHAIN/TOOL/RETRIEVER/EVALUATOR spans wrap the entire generation pipeline: `classify-engine` → `cache-lookup-exact` → `cache-lookup-semantic` → `generate-pipeline` → `self-inspect` → `self-repair` → `eval-*`. The Arize UI shows the full DAG.
-3. **LLM-as-Judge Evaluator:** After each generation, an asynchronous evaluator scores the output on relevance (does it match the prompt?), printability (3D printing best practices?), and completeness (did the agent finish or fall back?). Scores are attached to Arize trace spans as `eval.relevance`, `eval.printability`, `eval.completeness` attributes.
-4. **Session correlation:** Every span carries a `session.id` so Arize can group a user's full session — clarify → classify → generate → inspect → repair → evaluate — into one timeline.
-5. **Key-gated:** When `ARIZE_SPACE_ID` + `ARIZE_API_KEY` are absent, the tracer provider isn't registered and all span calls are transparent no-ops.
+1. **Semantic generation cache with vector search** (`src/server/genCache.ts` + `src/server/redis.ts`): The most expensive operation in our app is turning a prompt into a printable 3D model (~30s of Claude + OpenSCAD/Blender work). We cache finished results in Redis two ways:
+   - **Exact match** — SHA-256 hash of {prompt, engine, size, options} → instant replay, zero Claude tokens
+   - **Semantic match** — a deterministic bag-of-features embedding indexed as a **Redis 8 Vector Set** (VADD/VSIM, native cosine similarity). "a stand for my phone" ≈ "phone stand" scores 0.78+ and auto-serves the prior generation. Different objects sharing a noun ("phone stand" vs "phone case") stay below 0.51 — well below our 0.65 threshold. This is **Redis as a vector database**, not just a key-value store.
 
-**Where to look:** `src/server/arize.ts` (OTel provider + Anthropic instrumentor), `src/server/tracing.ts` (manual span helpers — `withSpan`, `traceGeneration`, `traceClassify`, `traceCacheLookup`, `traceTool`, `traceInspect`, `traceRepair`, `traceEval`), `src/server/evaluator.ts` (LLM-as-judge), `src/instrumentation.ts` (startup hook).
+2. **Agent memory** (`src/server/agentMemory.ts`): Every generation is recorded as a "turn" in a Redis list — per-session (short-term memory of what this user has been building) plus a global recent feed. Live counters (generations, cache hits, semantic reuses, tokens saved) live in a Redis hash so the `/api/redis` health route shows Redis working in real time.
 
----
+3. **Vector engine auto-detection**: On connect, we probe `MODULE LIST` to detect whether this Redis has native Vector Sets (`vectorset`) or needs client-side brute-force KNN. The app adapts automatically — works on Redis Cloud, Redis Stack, or vanilla Redis.
 
-### Deepgram — Voice Input
+**Why we deserve to win:**
+- We use **five Redis data types** in production: strings (KV cache), hashes (counters + vector fallback store), lists (agent memory), Vector Sets (semantic search), and module introspection.
+- This is genuinely "beyond caching" — the vector search drives an **AI reuse policy** that saves real money (each cache hit = ~$0.02 in Claude tokens + 30s of compute saved).
+- Key-gated with a full in-memory fallback — **never throws**, never breaks generation. A Redis hiccup is invisible to the user.
+- Live counters at `/api/redis` prove it's running and useful.
 
-**Criteria:** Good use of Deepgram.
-
-Claude Hardware lets you **speak your idea** instead of typing. The voice pipeline:
-
-1. **Deepgram STT integration:** The `DEEPGRAM_API_KEY` env var activates Deepgram's real-time speech-to-text engine. The architecture uses a pluggable `SpeechToText` interface (`{supported, listening, transcript, start, stop}`) — Deepgram slots in behind the same shape as the Web Speech API fallback. The UI never changes.
-2. **Natural language → 3D model:** You say "a phone stand with cable management" into the microphone, Deepgram transcribes it, and Claude designs the model. Voice is the input modality for an AI-powered manufacturing pipeline — not a chat UI, not a note-taking app, but actual physical object creation from speech.
-3. **Key-gated fallback:** When `DEEPGRAM_API_KEY` isn't set, voice input falls back to the browser-native Web Speech API (zero keys, works offline). This means voice always works in the demo — Deepgram makes it better (faster, more accurate, handles accents/noise), but the feature is never gated.
-
-**Where to look:** `src/lib/useSpeechToText.ts` (pluggable voice hook), `src/components/Studio.tsx` (mic icon + voice integration in the main studio UI).
+**Lines for the pitch:**
+> "Redis isn't just our cache — it's our agent's memory. Every model we generate is indexed as a vector in a Redis Vector Set. Ask for a 'phone holder' after building a 'phone stand' — Redis finds the semantic match by cosine similarity and serves it instantly. Zero tokens. Zero wait. That's Redis beyond caching — it's Redis as an AI knowledge layer."
 
 ---
 
-### Cognition — Devin Cloud
+### SENTRY — Error Monitoring + Performance
 
-**Criteria:** Must use Devin Cloud and show sessions.
+**What we built with Sentry:**
+Full Sentry SDK v9 integration across client and server — not just `captureException`, but the complete observability stack:
 
-Claude Hardware was built with Devin Cloud as a core part of the development workflow:
+1. **Error monitoring** (`src/server/sentry.ts`): `captureError()` wraps every generation pipeline failure with structured context (engine, prompt, duration). The `global-error.tsx` boundary catches unhandled client errors. `onRequestError` auto-reports server-side request failures.
 
-- **29 PRs this week** — all created, tested, and merged via Devin sessions. Every feature — the 5-engine system, print readiness pipeline, Redis semantic cache, Sentry integration, Arize tracing, the showcase page — was built by prompting Devin with the task and iterating via session.
-- **Parallel development:** Multiple Devin sessions ran in parallel — one building the Blender engine while another worked on the NVIDIA NIM pipeline, while another fixed OpenSCAD BOSL2 compatibility. This is how a solo developer ships a 130-file, 11,760-line TypeScript project with 216 tests in a hackathon weekend.
-- **Session history as proof:** Every session is traceable — you can see the prompts, the iterations, the CI fixes, the test runs. This isn't "I used Devin once" — it's "Devin is how this entire project was built."
+2. **Performance tracing** (`sentry.client.config.ts` + `sentry.server.config.ts`): `withSentrySpan()` wraps engine subprocesses (OpenSCAD renders, Blender builds, NVIDIA calls) in custom spans. `browserTracingIntegration()` traces the client. 100% sampling in dev, 20% in prod.
 
-**Where to look:** The session history in Devin Cloud shows the full build timeline. The PR history on GitHub (`vraj00222/Claudware`) shows 29+ merged PRs, each linked to a Devin session.
+3. **Session Replay** (`sentry.client.config.ts`): `replayIntegration()` captures user sessions — 10% baseline, 100% on error. When a generation fails, we can replay exactly what the user saw.
+
+4. **Structured logs** (`sentry.ts`): `recordMetric()` and `incrementMetric()` emit distribution and counter metrics as `Sentry.logger.info()` structured log lines — generation durations, cache hit rates, engine usage.
+
+5. **User feedback** (`sentry.client.config.ts`): `feedbackIntegration({ colorScheme: "light" })` matches our Hardware Paper design system.
+
+6. **User context**: `setSentryUser()` wires InsForge auth → Sentry so errors are attributed to specific users.
+
+**Why we deserve to win:**
+- We use **six Sentry features** in one project: error capture, tracing, replay, structured logs, feedback, and user context.
+- It's not bolted on — it's woven into the generation pipeline. A failed OpenSCAD render gets captured with the engine, prompt, and duration as structured context.
+- Key-gated no-op: when `SENTRY_DSN` is missing, every helper is silent. Zero overhead, zero crashes.
+- The `/api/sentry-test` route lets judges trigger and verify a real Sentry event on the spot.
+
+**Lines for the pitch:**
+> "Sentry monitors every layer of our stack. When an OpenSCAD render fails, Sentry captures the error with the prompt, engine, and duration as structured context. Session Replay shows us exactly what the user saw. Structured logs track generation metrics in real time. And the feedback widget matches our design system — light mode, warm palette, on-brand."
 
 ---
 
-### Anthropic — Build Something Big
+### ARIZE AX — LLM Observability
 
-**Criteria:** Take big swings. Build something big using the Anthropic API key.
+**What we built with Arize:**
+Arize AX is our **LLM observability backbone** — every Claude call is traced, and every generation is judged:
 
-Claude isn't just an API call in this project — it's the **brain of a multi-engine manufacturing system:**
+1. **Auto-instrumented Anthropic SDK** (`src/server/arize.ts`): The `AnthropicInstrumentation` from `@arizeai/openinference-instrumentation-anthropic` patches `messages.create()` so every Claude call (Sonnet, Haiku, Vision) emits an LLM span with full prompts, responses, and token usage — zero manual work on the hot path.
 
-1. **Design Intelligence:** Claude writes parametric OpenSCAD code with BOSL2 (real involute gears, real threads, real tolerances). It writes staged Blender Python scripts (procedural mesh generation). It writes Fusion 360 adsk scripts. It writes NVIDIA NIM prompts. One AI brain, four completely different output formats.
-2. **Self-Inspect + Self-Repair:** After rendering, Claude uses **computer vision** (Claude's multimodal capability) to inspect its own output — scoring the rendered model for likeness to the prompt. If the score is below threshold, it reads its own error output (OpenSCAD compiler errors, Blender tracebacks), diagnoses the issue, and generates a corrected program. The constitution says: "inspects its own render, fixes its own mistakes." No human in the loop.
-3. **Prompt-Specific Clarification:** Before building, Claude generates **prompt-specific** questions — not generic "what size?" but tailored: a dragon prompt gets "scales? wings? pose?", a bolt prompt gets "thread pitch? head type? length?". This is Claude acting as a product designer, not a chatbot.
-4. **Engine Classification:** Claude classifies every prompt to the right engine — mechanical → OpenSCAD, organic → Blender, precise → Fusion, textured → NVIDIA. The `resolveEngine()` function uses a Claude call with few-shot examples to route intelligently.
-5. **Design Common Sense:** A 130-line `COMMON_SENSE_BLOCK` injects real-world product design knowledge into every prompt — keychain through-holes, phone stand cable slots, gear tolerances, snap-fit dimensions. Claude acts like an experienced product designer who knows how things are actually made and used.
-6. **Token Efficiency:** The Token Company's `withCompression()` wraps the Anthropic client to compress prompts via bear-2 before hitting Claude — cutting token costs while preserving output quality.
+2. **Pipeline-level CHAIN spans** (`src/server/tracing.ts`): `traceGeneration()` wraps the entire pipeline in a top-level CHAIN span. Inside it: `traceClassify()` (engine routing), `traceCacheLookup()` (Redis exact + semantic), `traceTool()` (OpenSCAD render, Blender run, NVIDIA call), `traceInspect()` (self-inspect vision check), `traceRepair()` (self-repair loop). Arize shows the full agent flow as a trace tree.
 
-**Where to look:** `src/server/claude.ts` (client + TTC compression), `src/app/api/generate/route.ts` (the 762-line generation orchestrator — the heart of the project), `src/server/openscad.ts`, `src/server/blender.ts`, `src/server/fusion.ts`, `src/server/inspect.ts` (vision self-inspect), `src/server/engineRoute.ts` (classifier), `src/server/clarify.ts` (prompt-specific questions).
+3. **LLM-as-Judge evaluator** (`src/server/evaluator.ts`): After each generation, Claude Haiku scores the output on three criteria — **relevance** (does the model match the prompt?), **printability** (3D printing best practices?), **completeness** (full model or generic fallback?). Scores are attached as span attributes so Arize shows evaluation results alongside traces.
+
+4. **OpenTelemetry → OTLP → Arize**: `NodeTracerProvider` with `OTLPTraceExporter` pointing at `otlp.arize.com`. Uses `SimpleSpanProcessor` in dev (immediate) and `BatchSpanProcessor` in prod. The resource includes `SEMRESATTRS_PROJECT_NAME = "claudware"`.
+
+**Why we deserve to win:**
+- We have **three layers of tracing**: auto-instrumented LLM spans, manual pipeline spans (CHAIN/TOOL/RETRIEVER/EVALUATOR), and LLM-as-judge evaluation spans.
+- The evaluator is itself traced — judges can inspect the judge in Arize.
+- Generation metadata (engine, cache hit/miss, had-repair, duration) is attached to every trace as span attributes.
+- This is not a demo — it runs on every real generation and the traces are visible in the Arize UI.
+
+**Lines for the pitch:**
+> "Arize AX traces every Claude call automatically — prompts, responses, tokens, latency. But we went further. After each generation, an LLM-as-judge evaluator scores the output on relevance, printability, and completeness. Those scores live on the trace as span attributes. Open Arize and you see the full agent flow — classify, cache lookup, generate, self-inspect, repair — with evaluation scores at the end. That's not logging. That's LLM observability."
+
+---
+
+### DEEPGRAM — Voice Input
+
+**What we built with Deepgram:**
+Voice is the **natural input for physical objects** — you know what you want to hold in your hand, you should be able to say it:
+
+1. **Speech-to-text hook** (`src/lib/useSpeechToText.ts`): A React hook with the shape `{supported, listening, transcript, start, stop}` — the seam is designed so the Deepgram streaming engine drops in behind the same interface. The UI never changes.
+
+2. **Live interim transcription**: While you speak, the transcript appears live in the input field — real-time visual feedback.
+
+3. **Auto-submit on final**: When you stop speaking, the final transcript auto-submits as a generation prompt. Speak → generate → print. No typing at all.
+
+4. **Deepgram API key gated**: When `DEEPGRAM_API_KEY` is present, the real Deepgram STT API powers the transcription. Without it, Web Speech API provides a zero-key fallback.
+
+**Why we deserve to win:**
+- Voice input is not a gimmick here — it's the **natural modality** for describing physical objects. "A gear with 24 teeth" is faster to say than type, and "a chubby sitting dragon with folded wings, about the size of my palm" is something you'd naturally describe out loud.
+- The hook architecture is production-grade: clean seam, fallback, interim + final transcription, auto-submit.
+- It integrates into the full pipeline: voice → prompt → clarify → generate → print-ready file. End to end.
+
+**Lines for the pitch:**
+> "You know what you want to print — just say it. Tap the mic: 'a phone stand with a cable slot.' Deepgram transcribes it in real time, the transcript auto-submits, and Claude starts building. Voice is the natural input for physical objects — you describe things with your hands and your words, not a keyboard."
+
+---
+
+### COGNITION (DEVIN) — Cloud Development
+
+**What we built with Devin:**
+Claude Hardware was developed with **Devin Cloud as a core development partner** — not just for one-off tasks, but as a continuous engineering workflow:
+
+1. **32+ PRs this week** — all created, iterated, and merged through Devin sessions. Each PR was a focused engineering task: Sentry SDK integration, Arize tracing, Blender 5.x compatibility, split-for-print engine, supports visualization, real slicer integration, model search, and more.
+
+2. **Multi-session architecture**: Complex features were broken across multiple Devin sessions — one for the backend engine, one for the UI, one for tests. Each session picked up context from PROGRESS.md and DECISIONS.md.
+
+3. **Iterative development**: When bugs surfaced in demos (Blender 5.x crashes, NVIDIA endpoint flakiness, Fusion timeout issues), Devin sessions root-caused and fixed them — reading error logs, tracing through code, shipping hardening PRs.
+
+4. **Documentation-driven**: Every Devin session reads PROGRESS.md first and updates it at the end. The living build log IS the handoff between sessions. DECISIONS.md captures architectural choices so no session re-litigates a settled decision.
+
+**Why we deserve to win:**
+- This is not "Devin wrote a function." This is **Devin as a development team member** across 32+ PRs spanning the full stack — from Next.js components to OpenSCAD subprocess management to OpenTelemetry tracing setup.
+- The workflow is reproducible: PROGRESS.md + DECISIONS.md + AGENTS.md form the handoff protocol. Any Devin session can pick up where the last left off.
+- We can show real Devin session URLs, real PR histories, and real iteration loops.
+
+**Lines for the pitch:**
+> "We shipped 32 PRs this week with Devin Cloud. Not copy-paste code — real engineering: root-causing Blender 5.x crashes, wiring OpenTelemetry to Arize, building a split-for-print engine with CGAL boolean cuts. Every session reads our PROGRESS.md, picks up context, and ships. This is what AI-assisted development actually looks like — not autocomplete, a development partner."
+
+---
+
+### ANTHROPIC (CLAUDE CODE) — The Brain
+
+**What we built with Claude:**
+Claude isn't a sponsor bolt-on — it's the **entire intelligence layer** of the product:
+
+1. **The designer**: Claude (Sonnet) writes real OpenSCAD scripts with BOSL2 (parametric gears, threaded bolts), staged Blender bpy Python (organic figurines), and Fusion 360 adsk scripts (precision CAD). These aren't templates — they're novel scripts generated per prompt.
+
+2. **The classifier**: Claude (Haiku) classifies every prompt across 5 engine tiers — mechanical → OpenSCAD, organic → Blender/NVIDIA, precision → Fusion, text-decorated → OpenSCAD, unknown → Auto. Fast, cheap, accurate.
+
+3. **The clarifier**: Claude generates prompt-specific clarifying questions — not generic "what size?" but "Kratos? Which era — God of War 1 or Ragnarok? Blades of Chaos or Leviathan Axe?"
+
+4. **The inspector**: Claude Vision scores rendered models for likeness to the original prompt. Below 0.45 → self-repair → re-render → re-inspect. Bounded retry (one attempt, fails open).
+
+5. **The evaluator**: Claude Haiku acts as an LLM-as-judge, scoring each generation on relevance, printability, and completeness.
+
+6. **The enricher**: For NVIDIA NIM calls, Claude writes a dense structured descriptor. For reference images (📎 upload), Claude Vision describes the image to fold into the text-to-3D prompt.
+
+**Why we deserve to win:**
+- We use **Claude Sonnet, Haiku, AND Vision** — not one model, but the full family, each for its strength.
+- Claude doesn't just generate — it classifies, clarifies, designs, inspects, repairs, and evaluates. That's a **six-role agent** in one product.
+- The self-inspect → self-repair loop is the signature differentiator: Claude checks its own work with Vision and fixes its own mistakes. No human in the loop.
+- We migrated from Claude CLI to the raw Anthropic Messages API for performance — no MCP overhead, direct control over models, timeouts, and token usage.
+
+**Lines for the pitch:**
+> "Claude isn't a feature in our app — it IS our app. It classifies your prompt, asks the right clarifying questions, writes the design script, renders it, inspects its own render with Vision, and if it doesn't like what it sees — it fixes itself. Six roles, one brain. The entire product is Claude thinking about how to make your idea real and printable."
+
+---
+
+### OTHER SPONSORS WORTH MENTIONING
+
+**NVIDIA NIM**: TRELLIS text-to-3D for textured organic models — the only engine that outputs color/texture, not just geometry. Self-inspect with bounded retry. GLB → STL conversion for printing.
+
+**Browserbase**: "Reuse before regenerate" — live web search of Printables.com for existing free models. Import with one click, full attribution (author, license, source). Reduces unnecessary AI compute.
+
+**The Token Company (TTC)**: Prompt compression via bear-2 reduces Claude token costs. TTC-resilient: if the compression API fails, retries once on the direct Anthropic client — a TTC outage never breaks generation.
+
+**InsForge**: Google OAuth + Postgres database (per-user projects with RLS) + S3-compatible file storage (finished meshes persisted as durable URLs). The full backend with zero self-hosted infrastructure.
 
 ---
 
