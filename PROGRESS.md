@@ -43,6 +43,25 @@
   (intermittently slow/erroring server-side — outside our code). OPEN Q for Vraj: change unknown→default from
   NVIDIA to OpenSCAD given endpoint flakiness?
 
+## FEATURE SESSION (mascot likeness · slicer · supports viz · split-for-print) — all merged to main
+- [x] PR #16 — MASCOT LIKENESS: `canonicalDescriptor()` now an on-brand Claude/Clawd identity (coral teardrop +
+      Anthropic sunburst) + `outfitClause()` deterministically composes outfits ("claude code mascot in a cowboy
+      hat" → hat/bandana/boots). Fed into the Blender build path too, so the offline fallback is recognizable.
+- [x] PR #17 — REAL SLICER (PrusaSlicer console → actual G-code: real supports/time/grams + G-code download).
+      Binary+flag-gated (`SLICER_BIN`/`ENABLE_SLICER`); zero-tool heuristic path unchanged. `parseGcodeEstimate`
+      handles PrusaSlicer + Cura comment formats (unit-tested). 120s subprocess timeout; never throws.
+- [x] PR #19 — SUPPORTS VISUALIZATION: `computeSupportPillars()` (pure, grid-snapped overhang test) → semi-
+      transparent terracotta pillars in the viewport behind a "Show supports" toggle (only when needed).
+- [x] PR #18 — SPLIT-FOR-PRINT ENGINE (`src/server/split.ts` + `/api/split`): cut a finished mesh into printable
+      parts joined by PUSH-FIT pegs/sockets, exact tolerances (socket = peg + 0.2mm clearance), 1–4 centred pegs
+      by cross-section. AUTO (too big for bed) + FORCED (N-part "print version"). OpenSCAD CGAL cuts; integration
+      tests assert 0 non-manifold edges per part. `renderExplodedPreview()` unions the parts pulled apart for the
+      viewport's PARTS view.
+- [x] PR #21 — SPLIT-FOR-PRINT UI: `PrintPartsPanel` (2/3/4 selector → "Create push-fit version") + Whole↔Parts
+      viewport toggle (a mesh swap to the exploded preview — no viewport rewrite) + per-part STL downloads + the
+      exact join measurements. Verified end-to-end in browser: 50×40×30 box → 3 parts (Ø5.4 peg → Ø5.6 socket,
+      0.2mm clearance), exploded preview with visible pegs, toggle back to whole, all part STLs download.
+
 ## DEMO BACKLOG — from Vraj test feedback (10h to demo; priority order)
 P1. [DONE #12+#14] NVIDIA NIM "fetch failed" — code already hardened (DEFAULT sampling, try/catch each fetch →
     transient retry ×8 w/ backoff, clear failure chip). Remaining slowness is NVIDIA's hosted endpoint, not us.

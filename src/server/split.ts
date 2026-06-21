@@ -249,3 +249,28 @@ export async function renderSplitParts(modelStl: Buffer, plan: SplitPlan, jobDir
   }
   return out;
 }
+
+/**
+ * Render a single "exploded" preview STL — every part pulled apart along the split axis (pegs visible) and
+ * unioned into one mesh. This is what the viewport shows in PARTS mode, so the Whole↔Parts toggle is just a
+ * mesh swap (no viewport changes). Assumes `renderSplitParts` already wrote partN.stl into `jobDir`.
+ */
+export async function renderExplodedPreview(plan: SplitPlan, parts: RenderedPart[], jobDir: string): Promise<string> {
+  const gap = Math.max(15, plan.connector.pegLength * 2 + 8);
+  const off = (i: number) => {
+    const d = round2(gap * i);
+    if (plan.axis === "x") return `[${d},0,0]`;
+    if (plan.axis === "y") return `[0,${d},0]`;
+    return `[0,0,${d}]`;
+  };
+  const body = parts
+    .map((p, i) => `  translate(${off(i)}) import("${path.basename(p.stlPath)}");`)
+    .join("\n");
+  const scad = `union(){\n${body}\n}\n`;
+  const scadPath = path.join(jobDir, "exploded.scad");
+  const stlPath = path.join(jobDir, "exploded.stl");
+  await writeFile(scadPath, scad);
+  await execFileP(OPENSCAD_BIN, ["-o", stlPath, scadPath], { cwd: jobDir, timeout: 120_000, maxBuffer: 32 << 20 });
+  if (!existsSync(stlPath)) throw new Error("couldn't render the parts preview");
+  return stlPath;
+}

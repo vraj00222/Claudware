@@ -147,6 +147,43 @@ export function playPrepareStream(meshUrl: string, onEvent: (e: AgentEvent) => v
 }
 
 /**
+ * SPLIT-FOR-PRINT stream: POST a finished mesh to /api/split → cut it into push-fit parts. Same SSE shape;
+ * the studio feeds the events into its reducer (tool chips + the `split` package with per-part STL URLs +
+ * exact connector measurements + an exploded preview mesh). `parts` forces an N-part version even if it fits.
+ */
+export function playSplitStream(meshUrl: string, opts: { parts?: number; clearance?: number; bed?: string } | undefined, onEvent: (e: AgentEvent) => void): Player {
+  const ctrl = new AbortController();
+  (async () => {
+    try {
+      const res = await fetch("/api/split", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meshUrl, ...opts }),
+        signal: ctrl.signal,
+      });
+      if (!res.body) return;
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buf.indexOf("\n\n")) >= 0) {
+          const frame = buf.slice(0, idx);
+          buf = buf.slice(idx + 2);
+          const data = frame.split("\n").find((l) => l.startsWith("data:"));
+          if (!data) continue;
+          try { onEvent(JSON.parse(data.slice(5).trim()) as AgentEvent); } catch { /* skip */ }
+        }
+      }
+    } catch { /* aborted */ }
+  })();
+  return { cancel() { ctrl.abort(); } };
+}
+
+/**
  * IMPORT stream: POST a chosen search result to /api/import and parse the SSE back into the SAME
  * `AgentEvent`s the generate stream emits (mesh/estimate/printplan/summary) — so the studio reuses
  * its existing event handler to show + save an imported model exactly like a generated one.
