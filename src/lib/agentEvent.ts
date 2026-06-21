@@ -63,7 +63,8 @@ export interface SplitResult {
   connector: { type: "push-fit"; pegDiameter: number; socketDiameter: number; clearance: number; pegLength: number; count: number };
   reason: string;
   guide: string;
-  wholeUrl?: string; // the original one-piece mesh, so the UI can toggle Whole ↔ Parts
+  wholeUrl?: string;   // the original one-piece mesh, so the UI can toggle Whole ↔ Parts
+  previewUrl?: string; // an exploded preview mesh (parts pulled apart, pegs visible) for PARTS view
 }
 
 /* ───────────────────────── Print-Readiness v2 (the "Prepare for print" package) ─────────────────────────
