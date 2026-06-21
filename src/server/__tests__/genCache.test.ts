@@ -45,6 +45,8 @@ describe("genCache", () => {
   it("scores rephrasings high and different objects low", () => {
     const stand = embed("phone stand");
     expect(cosine(stand, embed("a stand for my phone"))).toBeGreaterThan(SEMANTIC_THRESHOLD);
+    // a different object that merely shares a noun must stay below the reuse threshold
+    expect(cosine(stand, embed("phone case"))).toBeLessThan(SEMANTIC_THRESHOLD);
     expect(cosine(stand, embed("a keychain with my name"))).toBeLessThan(0.3);
   });
 

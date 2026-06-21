@@ -18,10 +18,11 @@ import { rGet, rSet, rVectorUpsert, rVectorKnn, type VectorHit } from "./redis";
 const TTL_SEC = 7 * 24 * 3600; // a week — plenty for a demo / hackathon weekend
 const GEN_PREFIX = "cw:gen:";
 export const EMBED_DIM = 256;
-/** Cosine ≥ this auto-serves a semantically-similar prior generation. Tuned so genuine rephrasings/
- *  reorderings ("a stand for my phone" ≈ "phone stand", ~0.82–1.0) reuse, while different objects
- *  (a phone holder vs a keychain, <0.5) never do. */
-export const SEMANTIC_THRESHOLD = 0.82;
+/** Cosine ≥ this auto-serves a semantically-similar prior generation. With the keyword-weighted
+ *  embedding below, genuine rephrasings/reorderings ("a stand for my phone" ≈ "a simple phone stand")
+ *  score ~0.78–1.0 while different objects sharing a noun (phone stand vs phone case) stay ≤0.51 — so
+ *  this sits in the wide gap between them. */
+export const SEMANTIC_THRESHOLD = 0.65;
 
 export interface GenCacheRequest {
   prompt: string;
@@ -78,7 +79,7 @@ export function embed(text: string): number[] {
   const tokens = norm.split(" ").filter(Boolean);
   const stop = new Set(["a", "an", "the", "of", "for", "to", "my", "me", "with", "and", "in", "on", "it", "that", "this"]);
   for (const tok of tokens) {
-    if (!stop.has(tok)) v[hashStr("t:" + tok) % EMBED_DIM] += 2; // whole-word features weighted higher
+    if (!stop.has(tok)) v[hashStr("t:" + tok) % EMBED_DIM] += 4; // whole-word identity dominates trigram noise
     const padded = `#${tok}#`;
     for (let i = 0; i + 3 <= padded.length; i++) v[hashStr("g:" + padded.slice(i, i + 3)) % EMBED_DIM] += 1;
   }
