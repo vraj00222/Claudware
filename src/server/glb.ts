@@ -4,6 +4,7 @@ import { writeFile } from "node:fs/promises";
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { BLENDER_BIN as BLENDER } from "./bin";
+import { stlExportPy } from "./blender";
 
 const execFileP = promisify(execFile);
 
@@ -61,7 +62,7 @@ else:
     bpy.ops.object.select_all(action='DESELECT')
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.wm.stl_export(filepath=${JSON.stringify(stlPath)}, export_selected_objects=True, ascii_format=True, up_axis='Z', forward_axis='Y')
+${stlExportPy(JSON.stringify(stlPath), { selected: true, indent: 4 })}
     print('STL_OK')
 `;
   const pyPath = path.join(path.dirname(stlPath), "glb2stl.py");
