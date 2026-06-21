@@ -22,14 +22,26 @@
 - Verified: 115/115 tests green · `npm run build` clean (13 routes) · OpenSCAD + classify smoke-tested live.
   NEXT: Vraj visually tests Blender / Fusion / NVIDIA (now on the Messages API) + the voice loop.
 
+## DEMO-HARDENING SESSION (direct prompt → iterate → print, never dead-end) — all merged to main
+- [x] PR #11 — robust openscad/blender binary resolution (env → .app → Homebrew → PATH); no more ENOENT.
+- [x] PR #12 — OpenSCAD SELF-REPAIR (feed a failed stage's error back to Claude, re-render once) + GUARANTEED
+      printable fallback (deterministic cube/variants) so a fresh prompt NEVER dead-ends. tryRenderOpenscad
+      returns {ok,err} instead of throwing. Verified live (BOSL2 removed → self-repair → watertight).
+- [x] PR #13 — Auto-router PARAMETRIC_PRINTABLE tier: text/lettering/flat-decorative/turned shapes (keychain,
+      sign, ornament, snowflake, chess, "that says…") now route to OpenSCAD (fast/watertight) not slow NVIDIA.
+- [x] PR #14 — Blender STL export now works on Blender 3.x AND 4.x (shared stlExportPy: wm.stl_export →
+      export_mesh.stl fallback). FIXES NVIDIA GLB→STL + the Blender engine producing empty geometry on 3.x.
+- [x] Blueprint suggestion: apt openscad + blender + python3-numpy (glTF importer needs numpy) + clone BOSL2.
+- Sweep (10 prompts, auto): OpenSCAD path flawless; NVIDIA-routed prompts gated on the hosted TRELLIS endpoint
+  (intermittently slow/erroring server-side — outside our code). OPEN Q for Vraj: change unknown→default from
+  NVIDIA to OpenSCAD given endpoint flakiness?
+
 ## DEMO BACKLOG — from Vraj test feedback (10h to demo; priority order)
-P1. NVIDIA NIM "fetch failed" — ROOT CAUSE: hosted TRELLIS function 500s (`nvcf-status: errored`) after ~91s,
-    triggered by the heavy `ss_sampling_steps:50 / slat_sampling_steps:50` knob (server-side timeout). Also
-    `requestGlb` doesn't catch network errors → a single blip throws "fetch failed" instead of retrying. FIX:
-    lighter default sampling (test 20/20 or default), try/catch around each fetch (transient → retry), and on
-    total NVIDIA failure surface a clear chip + offer Blender fallback so the demo never dead-ends.
-P1. Printable pipeline — must be FASTER and produce ACTUALLY printable output. Blender "snail" = a blobby
-    shell floating above a separate base (not a watertight printable solid) — can't demo printing that.
+P1. [DONE #12+#14] NVIDIA NIM "fetch failed" — code already hardened (DEFAULT sampling, try/catch each fetch →
+    transient retry ×8 w/ backoff, clear failure chip). Remaining slowness is NVIDIA's hosted endpoint, not us.
+    GLB→STL (Blender) now works on 3.x via #14; figures land as real meshes when the endpoint cooperates.
+P1. [PARTLY #12] Printable pipeline — never-dead-end + self-repair guarantee a printable solid every prompt;
+    Blender "snail" grounding/watertight still depends on bpy plan quality (P2).
 P2. Blender output quality — bpy prompt should make GROUNDED, watertight, single-solid, recognizable models
     (snail came out blobby + floating). A Blender EDIT iteration ("snail WITH shell") returned a broken/empty
     mesh (UI showed a PNG-placeholder = mesh failed to load). Harden the edit path.
