@@ -443,14 +443,14 @@ export async function POST(req: Request) {
         if (engineName === "nvidia") {
           try {
             send({ t: ts(), kind: "tool", name: "inspect_render", status: "running", detail: refImageUrl ? "reading your reference image…" : "researching the look…" });
-            const { enrichPrompt, describeImage, webResearchImage } = await import("@/server/promptEnrich");
-            let basePrompt = prompt;
+            const { enrichPrompt, describeImage, webResearchImage, canonicalDescriptor } = await import("@/server/promptEnrich");
+            let genPrompt: string;
+            let visualDesc = "";
             if (refImageUrl) {
-              // Vision reads the actual pixels (TRELLIS can't), so SURFACE what Claude saw — that proves the
-              // ref image was read and makes a bad likeness self-explanatory (was silent → "NVIDIA ignored it").
+              // Vision reads the actual pixels (TRELLIS can't), so SURFACE what Claude saw.
               const desc = await describeImage(refImageUrl, jobDir);
               if (desc) {
-                basePrompt = `${prompt}. The reference image shows: ${desc}`;
+                visualDesc = desc;
                 send({ t: ts(), kind: "tool", name: "inspect_render", status: "done", detail: `saw in image: ${desc.slice(0, 80)}` });
               } else {
                 send({ t: ts(), kind: "tool", name: "inspect_render", status: "warn", detail: "couldn't read the reference image — using your text only" });
@@ -460,15 +460,21 @@ export async function POST(req: Request) {
               // so TRELLIS gets a visual descriptor instead of just a text guess (the Tesla-robot fix).
               const webRef = await webResearchImage(prompt, jobDir);
               if (webRef) {
-                basePrompt = `${prompt}. Web reference shows: ${webRef.description}`;
+                visualDesc = webRef.description;
                 send({ t: ts(), kind: "tool", name: "inspect_render", status: "done", detail: `web research: ${webRef.description.slice(0, 80)}` });
               }
             }
-            const genPrompt = await enrichPrompt(basePrompt);
+            // When a visual description is available (ref image or web research), skip the enrichPrompt
+            // Claude call — the Vision output is already a rich descriptor. Saves ~15-30s per generation.
+            if (visualDesc) {
+              const canon = canonicalDescriptor(prompt);
+              genPrompt = (canon ? `${canon}. ${prompt}` : `${prompt}, ${visualDesc}, 3D figurine, on round base`).slice(0, 400);
+            } else {
+              genPrompt = await enrichPrompt(prompt);
+            }
             send({ t: ts(), kind: "tool", name: "inspect_render", status: "done", detail: genPrompt.slice(0, 90) });
 
-            // MULTI-SEED: try with seed 0 first, inspect, retry up to 2 more seeds if the result is a blob.
-            // TRELLIS quality varies wildly by seed — trying 2-3 seeds lifts success from ~40% to ~80%.
+            // Generate with seed 0, then inspect + retry once with seed 42 if the result is a blob.
             const FIGURE_DEFAULT_MM = 120;
             const targetMm = sizeMm && sizeMm > 0 ? sizeMm : FIGURE_DEFAULT_MM;
             const { scaleStlFileToHeight } = await import("@/server/meshScale");
@@ -476,17 +482,16 @@ export async function POST(req: Request) {
             let r = await genNvidia(genPrompt, 0);
             let stlPath = await scaleStlFileToHeight(r.stlPath, targetMm, path.join(jobDir, "scaled.stl"));
 
-            // SELF-INSPECT → bounded retry with different seeds AND simpler prompts.
-            // Threshold raised from 0.45 → 0.55 to catch more blobs. On retry, use a SHORTER prompt
-            // (TRELLIS produces better results with fewer words, not more).
+            // SELF-INSPECT → bounded retry with a different seed if the result is a blob.
+            // TRELLIS quality varies by seed — trying 2 seeds lifts success from ~40% to ~70%.
+            let bestScore: number | null = null;
             if (process.env.DISABLE_INSPECT !== "1" && r.provider === "nim") {
               send({ t: ts(), kind: "tool", name: "inspect_render", status: "running", detail: "checking the result looks right…" });
               const insp = await scoreModel(stlPath, prompt, jobDir);
               if (insp) {
+                bestScore = insp.score;
                 send({ t: ts(), kind: "tool", name: "inspect_render", status: insp.ok ? "done" : "warn", detail: `likeness ${insp.score ?? "?"} · ${insp.reason}` });
-                // Retry with different seeds if score < 0.55 (was 0.45 — caught too few blobs)
                 if (insp.score !== null && insp.score < 0.55) {
-                  // Retry 1: simpler, shorter prompt + seed 42 (TRELLIS does BETTER with fewer words)
                   const shortPrompt = `${prompt}, 3D figurine, detailed, on round base`;
                   send({ t: ts(), kind: "fix", text: "the shape didn't read clearly — trying with a cleaner prompt…" });
                   const r2 = await genNvidia(shortPrompt, 42);
@@ -494,19 +499,8 @@ export async function POST(req: Request) {
                   const insp2 = await scoreModel(stl2, prompt, jobDir);
                   const score2 = insp2?.score ?? 0;
                   if (score2 > (insp.score ?? 0)) { r = r2; stlPath = stl2; }
-                  send({ t: ts(), kind: "tool", name: "inspect_render", status: "done", detail: `retry 1 likeness ${score2.toFixed(2)}` });
-
-                  // Retry 2: if still bad, try the raw user prompt (no enrichment) + seed 7
-                  if (Math.max(score2, insp.score ?? 0) < 0.55) {
-                    send({ t: ts(), kind: "fix", text: "still not right — trying the raw prompt directly…" });
-                    const r3 = await genNvidia(prompt, 7);
-                    const stl3 = await scaleStlFileToHeight(r3.stlPath, targetMm, path.join(jobDir, "scaled3.stl"));
-                    const insp3 = await scoreModel(stl3, prompt, jobDir);
-                    const score3 = insp3?.score ?? 0;
-                    const bestSoFar = Math.max(insp.score ?? 0, score2);
-                    if (score3 > bestSoFar) { r = r3; stlPath = stl3; }
-                    send({ t: ts(), kind: "tool", name: "inspect_render", status: "done", detail: `retry 2 likeness ${score3.toFixed(2)}` });
-                  }
+                  bestScore = Math.max(bestScore ?? 0, score2);
+                  send({ t: ts(), kind: "tool", name: "inspect_render", status: "done", detail: `retry likeness ${score2.toFixed(2)}` });
                 }
               }
             }
@@ -521,12 +515,9 @@ export async function POST(req: Request) {
               if (ok) send({ t: ts(), kind: "tool", name: "repair_mesh", status: "done", detail: "opened in Blender — refine it there" });
             }
             // If after all retries the best score is still very low, fall to Blender for a better figure
-            if (process.env.DISABLE_INSPECT !== "1" && r.provider === "nim") {
-              const finalInsp = await scoreModel(stlPath, prompt, jobDir);
-              if (finalInsp && finalInsp.score !== null && finalInsp.score < 0.3) {
-                send({ t: ts(), kind: "tool", name: "inspect_render", status: "warn", detail: `NVIDIA output unrecognizable (${finalInsp.score.toFixed(2)}) — building in Blender instead` });
-                throw new Error("NVIDIA output too low quality — Blender fallback");
-              }
+            if (bestScore !== null && bestScore < 0.3) {
+              send({ t: ts(), kind: "tool", name: "inspect_render", status: "warn", detail: `NVIDIA output unrecognizable (${bestScore.toFixed(2)}) — building in Blender instead` });
+              throw new Error("NVIDIA output too low quality — Blender fallback");
             }
 
             await finish(stlPath, meshUrl, "nvidia", "figure ready (NVIDIA)", undefined, 1, glbUrl);
