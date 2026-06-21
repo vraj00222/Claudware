@@ -485,14 +485,20 @@ export async function POST(req: Request) {
 
         let plan: GenPlan, source: string;
         if (isBlender) {
-          try { plan = await claudeBpyPlan(prompt, isEdit ? base : undefined, primer); source = isEdit ? "claude-edit" : "claude"; }
+          // Named-subject likeness (e.g. the Claude mascot, dressed in any outfit) flows to the Blender
+          // build too — not just NVIDIA. This is what fixes "NVIDIA was down → Blender built a generic
+          // creature": the canonical Clawd descriptor is fed to the bpy planner so the fallback is on-brand.
+          const { canonicalDescriptor } = await import("@/server/promptEnrich");
+          const canon = isEdit ? "" : canonicalDescriptor(prompt);
+          const buildPrompt = canon ? `${canon}. ${prompt}`.slice(0, 900) : prompt;
+          try { plan = await claudeBpyPlan(buildPrompt, isEdit ? base : undefined, primer); source = isEdit ? "claude-edit" : "claude"; }
           catch (e) {
             // Don't silently hand back the generic fallback creature dressed as success (the user can't tell
             // a snail came out a stand-in figure). Surface the REAL reason — a timeout means Claude ran past
             // the limit (often a session-start concurrency starve); retrying alone usually succeeds.
             const why = /timed out|ETIMEDOUT|killed/i.test((e as Error).message) ? "Claude ran past the time limit (try again — the first request of a session can starve)" : (e as Error).message.slice(0, 90);
             send({ t: ts(), kind: "tool", name: "write_blender", status: "warn", detail: `couldn't write a custom model (${why}) → generic stand-in shape` });
-            plan = fallbackBpyPlan(prompt); source = "fallback";
+            plan = fallbackBpyPlan(buildPrompt); source = "fallback";
           }
         } else if (isEdit) {
           try { plan = await claudePlan(prompt, base); source = "claude-edit"; }
