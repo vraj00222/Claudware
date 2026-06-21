@@ -635,7 +635,7 @@ export function Studio() {
 function BootOverlay({ onSkip }: { onSkip: () => void }) {
   return (
     <div onClick={onSkip} style={{ flex: 1, position: "relative", minHeight: 0, overflow: "hidden", background: "#ECE7DC", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-      <RenderLoader status="Warming up the printer" sub="openscad · mesh · blender" />
+      <RenderLoader status="Warming up the printer" sub="DIY · Quick Shape · Pro Mechanical · Premium 3D" />
     </div>
   );
 }

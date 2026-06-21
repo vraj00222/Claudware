@@ -37,19 +37,19 @@ const PARAMETRIC_PRINTABLE =
 /** Classify a prompt to a concrete engine (never "auto"/"fusion" — those are explicit picks). */
 export function classifyEngine(prompt: string): { engine: ConcreteEngine; reason: string } {
   const p = prompt.toLowerCase();
-  if (EXPLICIT_BLENDER.test(p)) return { engine: "blender", reason: "you asked to build it live in Blender" };
-  if (ORGANIC.test(p)) return { engine: "nvidia", reason: "looks like a character / organic figure → NVIDIA (textured)" };
-  if (PARAMETRIC_PRINTABLE.test(p)) return { engine: "openscad", reason: "text / flat printable part → OpenSCAD" };
-  if (MECHANICAL.test(p)) return { engine: "openscad", reason: "looks like a mechanical / parametric part → OpenSCAD" };
-  if (SIMPLE.test(p)) return { engine: "openscad", reason: "a simple parametric shape → OpenSCAD" };
-  return { engine: "nvidia", reason: "unrecognised subject → NVIDIA (a textured attempt beats a block)" };
+  if (EXPLICIT_BLENDER.test(p)) return { engine: "blender", reason: "you asked to build it live → Quick Shape" };
+  if (ORGANIC.test(p)) return { engine: "nvidia", reason: "looks like a character / organic figure → Premium 3D (textured with color)" };
+  if (PARAMETRIC_PRINTABLE.test(p)) return { engine: "openscad", reason: "text / flat printable part → DIY" };
+  if (MECHANICAL.test(p)) return { engine: "openscad", reason: "looks like a mechanical / parametric part → DIY" };
+  if (SIMPLE.test(p)) return { engine: "openscad", reason: "a simple parametric shape → DIY" };
+  return { engine: "nvidia", reason: "unrecognised subject → Premium 3D (a textured attempt beats a block)" };
 }
 
 const MANUAL_REASON: Record<ConcreteEngine, string> = {
-  openscad: "you chose OpenSCAD (parametric)",
-  blender: "you chose Blender (live build)",
-  fusion: "you chose Fusion (parametric CAD)",
-  nvidia: "you chose NVIDIA (textured 3D)",
+  openscad: "you chose DIY (maker parts & parametric)",
+  blender: "you chose Quick Shape (fast procedural build)",
+  fusion: "you chose Pro Mechanical (precision CAD)",
+  nvidia: "you chose Premium 3D (textured with color)",
 };
 
 /** Resolve the requested engine: a manual pick always wins; "auto" defers to the classifier. */

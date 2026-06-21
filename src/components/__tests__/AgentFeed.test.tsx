@@ -11,9 +11,9 @@ describe("AgentFeed", () => {
     expect(screen.getByText("write_openscad")).toBeInTheDocument();
     expect(screen.getByText("cable slot intersects riser wall")).toBeInTheDocument();
     // the engine selector now exposes all four engines + Auto
-    expect(screen.getByText("Blender")).toBeInTheDocument();
-    expect(screen.getByText("Fusion")).toBeInTheDocument();
-    expect(screen.getByText("NVIDIA")).toBeInTheDocument();
+    expect(screen.getByText("Quick Shape")).toBeInTheDocument();
+    expect(screen.getByText("Pro Mechanical")).toBeInTheDocument();
+    expect(screen.getByText("Premium 3D")).toBeInTheDocument();
     expect(screen.getByText("Auto")).toBeInTheDocument();
   });
 });

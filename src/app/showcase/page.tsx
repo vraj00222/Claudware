@@ -59,17 +59,17 @@ const SHOWCASE: ShowcaseItem[] = [
 ];
 
 const ENGINE_LABELS: Record<string, string> = {
-  openscad: "OpenSCAD",
-  blender: "Blender",
-  nvidia: "NVIDIA NIM",
-  fusion: "Fusion 360",
+  openscad: "DIY",
+  blender: "Quick Shape",
+  nvidia: "Premium 3D",
+  fusion: "Pro Mechanical",
 };
 
 const ENGINE_DESCRIPTIONS: Record<string, string> = {
-  openscad: "Parametric CAD via BOSL2 — real threads, real gears, real involute profiles",
-  blender: "Procedural bpy scripts — organic shapes, figures, artistic models",
-  nvidia: "TRELLIS text-to-3D — textured figurines, characters, creatures",
-  fusion: "Precise parametric CAD — assemblies, multi-part prints, engineering parts",
+  openscad: "Maker-grade parametric parts — gears, bolts, brackets & enclosures you design yourself",
+  blender: "Fast procedural models — simpler organic shapes, quick prototypes & artistic forms",
+  nvidia: "Premium textured 3D with color — rich figurines, characters & creatures",
+  fusion: "Precision CAD for big mechanical parts — assemblies, multi-part prints & engineering components",
 };
 
 function EngineBadge({ engine }: { engine: string }) {
