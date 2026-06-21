@@ -8,6 +8,7 @@ import type { EstimateOverride } from "@/server/printReady/readiness";
 import { writeFile, mkdir, readFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { AgentEvent, ExportFormat } from "@/lib/agentEvent";
+import { Sentry, recordMetric, incrementMetric, captureError } from "@/server/sentry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -104,7 +105,11 @@ export async function POST(req: Request) {
         send({ t: ts(), kind: "tool", name: "validate", status: readiness.grade === "needs_work" ? "warn" : "done", detail: `readiness ${readiness.score}/100 · ${readiness.grade.replace("_", " ")} · orient: ${readiness.orientation.label}` });
         send({ t: ts(), kind: "printready", readiness });
         send({ t: ts(), kind: "summary", text: readiness.narrative });
+        incrementMetric("prepare.completed", 1, { grade: readiness.grade });
+        recordMetric("prepare.duration", Date.now() - t0, { grade: readiness.grade });
+        Sentry.logger.info("Print preparation completed", { score: readiness.score, grade: readiness.grade });
       } catch (err) {
+        captureError(err, { meshUrl });
         send({ t: ts(), kind: "tool", name: "validate", status: "error", detail: (err as Error).message.slice(0, 120) });
         send({ t: ts(), kind: "summary", text: "couldn't prepare this model for print — try regenerating it first" });
       } finally { controller.close(); }

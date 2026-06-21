@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   // OTel + Arize packages must NOT be bundled by Next.js — they use Node-only APIs.
@@ -11,6 +12,7 @@ const nextConfig: NextConfig = {
     "@arizeai/openinference-instrumentation-anthropic",
     "@arizeai/openinference-semantic-conventions",
     "@arizeai/openinference-core",
+    "@sentry/profiling-node",
   ],
   async rewrites() {
     return {
@@ -23,4 +25,16 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  // Suppress noisy source-map-upload warnings when SENTRY_AUTH_TOKEN is not set
+  silent: !process.env.SENTRY_AUTH_TOKEN,
+
+  // Upload a larger set of source maps for readable stack traces in Sentry
+  widenClientFileUpload: true,
+
+  // Tunnel Sentry events through a Next.js rewrite to avoid ad-blockers
+  tunnelRoute: "/monitoring",
+
+  // Automatically tree-shake Sentry logger statements in production
+  disableLogger: true,
+});
