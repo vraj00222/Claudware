@@ -170,6 +170,24 @@ async function claudePlan(prompt: string, base?: string): Promise<GenPlan> {
   return { object: "model", summary: prompt.trim(), stages, params: {} };
 }
 
+/** One-shot self-repair: feed a failed stage's OpenSCAD + the compiler error back to Claude and ask for a
+ *  corrected program (the constitution's "inspect its own render, fix its own mistakes"). Returns null on any
+ *  failure so the caller falls back. BOSL2 part libraries are re-injected via ensureBosl2Parts. */
+async function repairOpenscad(prompt: string, brokenScad: string, errText: string): Promise<string | null> {
+  const instruction =
+    `This OpenSCAD program, meant to render a 3D-printable "${prompt}", FAILED with:\n` +
+    `${(errText || "empty geometry").slice(0, 700)}\n\n` +
+    `--- PROGRAM ---\n${brokenScad}\n--- END ---\n\n` +
+    `Return ONLY a corrected, complete OpenSCAD program that compiles and renders NON-EMPTY geometry. ` +
+    `Fix the specific error (wrong BOSL2 args, undefined variables, bad syntax). BOSL2 part libraries are ` +
+    `auto-included — do NOT add include lines for them. Keep $fn ≤ 64. No prose, no markdown, no backticks.`;
+  try {
+    const out = await claudeText(instruction, { maxTokens: 8_000 });
+    const scad = out.replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim();
+    return scad ? ensureBosl2Parts(scad) : null;
+  } catch { return null; }
+}
+
 /** Last-resort plan so the route never hard-fails — multi-stage so it still shows step-by-step. */
 function fallbackPlan(prompt: string): GenPlan {
   const h = `// ${prompt.trim().replace(/\n/g, "\n// ")}\n$fn=48;\n`;
@@ -193,6 +211,19 @@ async function renderStage(scad: string, stlPath: string, scadPath: string): Pro
   const { stderr } = await execFileP(OPENSCAD, ["-o", stlPath, scadPath], { timeout: 60_000, maxBuffer: 8 << 20, env: { ...process.env, OPENSCADPATH: OPENSCAD_LIBS } });
   const unknown = [...(stderr || "").matchAll(/Ignoring unknown (?:module|function) '([^']+)'/g)].map((m) => m[1]);
   return [...new Set(unknown)];
+}
+
+/** Render an OpenSCAD stage, treating a compile error OR empty output as a SOFT failure (returning the error
+ *  text) instead of throwing — so the caller can self-repair or fall back rather than dead-ending. */
+async function tryRenderOpenscad(scad: string, stlPath: string, scadPath: string): Promise<{ ok: boolean; unknown: string[]; err?: string }> {
+  try {
+    const unknown = await renderStage(scad, stlPath, scadPath);
+    if (!existsSync(stlPath) || !validateStl(stlPath)) return { ok: false, unknown, err: "rendered empty geometry" };
+    return { ok: true, unknown };
+  } catch (e) {
+    const err = (e as { stderr?: string }).stderr?.trim() || (e as Error).message;
+    return { ok: false, unknown: [], err };
+  }
 }
 
 export async function POST(req: Request) {
@@ -488,19 +519,35 @@ export async function POST(req: Request) {
           if (!isBlender) await writeFile(WATCH, st.scad);
           send({ t: ts(), kind: "tool", name: "render_preview", status: "running", detail: st.label });
           const stl = path.join(jobDir, `stage${i}.stl`);
+          const scadPath = path.join(jobDir, `stage${i}.scad`);
           let unknown: string[] = [];
           try {
-            if (isBlender) await renderStageBlender(st.scad, stl, path.join(jobDir, `stage${i}.py`), live, isFinalStage);
-            else unknown = await renderStage(st.scad, stl, path.join(jobDir, `stage${i}.scad`));
-            if (!existsSync(stl)) throw new Error("no geometry produced");
-            // Validate STL has real geometry (not just a header / empty file)
-            if (isBlender && !validateStl(stl)) {
-              // On edit, keep the previous good mesh instead of emitting a broken one
-              if (isEdit && lastStl) {
-                send({ t: ts(), kind: "tool", name: "render_preview", status: "warn", detail: `${st.label}: produced empty mesh — kept the previous version` });
-                continue;
+            if (isBlender) {
+              await renderStageBlender(st.scad, stl, path.join(jobDir, `stage${i}.py`), live, isFinalStage);
+              if (!existsSync(stl)) throw new Error("no geometry produced");
+              // Validate STL has real geometry (not just a header / empty file)
+              if (!validateStl(stl)) {
+                // On edit, keep the previous good mesh instead of emitting a broken one
+                if (isEdit && lastStl) {
+                  send({ t: ts(), kind: "tool", name: "render_preview", status: "warn", detail: `${st.label}: produced empty mesh — kept the previous version` });
+                  continue;
+                }
+                throw new Error("empty STL (no geometry)");
               }
-              throw new Error("empty STL (no geometry)");
+            } else {
+              // OpenSCAD: render; on a compile error / empty geometry from a Claude-written stage, ask Claude
+              // to fix its own mistake once and re-render before giving up (never dead-end a good prompt).
+              let res = await tryRenderOpenscad(st.scad, stl, scadPath);
+              if (!res.ok && source.startsWith("claude")) {
+                send({ t: ts(), kind: "fix", text: `${st.label} didn't render — fixing the design…` });
+                const fixed = await repairOpenscad(prompt, st.scad, res.err || "");
+                if (fixed) {
+                  const res2 = await tryRenderOpenscad(fixed, stl, scadPath);
+                  if (res2.ok) { st.scad = fixed; await writeFile(WATCH, fixed); res = res2; }
+                }
+              }
+              if (!res.ok) throw new Error(res.err || "no geometry produced");
+              unknown = res.unknown;
             }
           } catch (err) {
             // On edit failure: keep previous good mesh, warn instead of dead-ending
@@ -523,9 +570,30 @@ export async function POST(req: Request) {
           // Edit produced nothing — never dead-end, provide actionable guidance
           if (isEdit) {
             send({ t: ts(), kind: "summary", text: "couldn't apply that edit cleanly — try a simpler change or regenerate from scratch" });
-          } else {
-            send({ t: ts(), kind: "summary", text: "couldn't render this one — try rephrasing or another engine" });
+            return;
           }
+          // Fresh prompt produced nothing (Claude/Blender/NVIDIA all failed on this box). GUARANTEE a
+          // printable result with the deterministic OpenSCAD plan — a clean solid beats a dead-end so the
+          // demo can always proceed to print. (OpenSCAD is the always-present engine.)
+          send({ t: ts(), kind: "fix", text: "the custom design wouldn't render — falling back to a clean printable shape…" });
+          const fb = fallbackPlan(prompt);
+          for (let i = 0; i < fb.stages.length; i++) {
+            const st = fb.stages[i];
+            await writeFile(WATCH, st.scad);
+            send({ t: ts(), kind: "tool", name: "render_preview", status: "running", detail: st.label });
+            const stl = path.join(jobDir, `fb${i}.stl`);
+            const res = await tryRenderOpenscad(st.scad, stl, path.join(jobDir, `fb${i}.scad`));
+            if (!res.ok) { send({ t: ts(), kind: "tool", name: "render_preview", status: "error", detail: `${st.label}: ${(res.err || "").slice(0, 80)}` }); continue; }
+            lastStl = stl; lastMeshUrl = `/generated/${jobId}/fb${i}.stl`; lastSource = st.scad; meshes++;
+            send({ t: ts(), kind: "tool", name: "render_preview", status: "done", detail: `${st.label} · ${st.detail}` });
+            send({ t: ts(), kind: "mesh", url: lastMeshUrl, label: st.label, stage: i + 1, totalStages: fb.stages.length });
+            await sleep(650);
+          }
+          if (meshes > 0) {
+            await finish(lastStl, lastMeshUrl, "openscad", `${fb.object} ready — printable fallback (${fb.stages.length} steps)`, lastSource, fb.stages.length);
+            return;
+          }
+          send({ t: ts(), kind: "summary", text: "couldn't render this one — try rephrasing or another engine" });
           return;
         }
         await finish(lastStl, lastMeshUrl, engineName, `${plan.object} ready — ${plan.stages.length} build steps`, lastSource, plan.stages.length);
