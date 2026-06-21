@@ -30,7 +30,7 @@ export function resolveModel(model?: string): string {
 
 let _client: Anthropic | (Anthropic & { compression: import("the-token-company").CompressionStats }) | undefined;
 
-function getClient(): Anthropic {
+async function getClient(): Promise<Anthropic> {
   if (_client) return _client;
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
@@ -40,8 +40,8 @@ function getClient(): Anthropic {
   const ttcKey = process.env.TTC_API_KEY;
   if (ttcKey) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { withCompression } = require("the-token-company/anthropic") as typeof import("the-token-company/anthropic");
+      // the-token-company is ESM-only (no `require` export) → must use dynamic import.
+      const { withCompression } = await import("the-token-company/anthropic");
       _client = withCompression(base, {
         compressionApiKey: ttcKey,
         aggressiveness: 0.2, // light — preserve instructions carefully
@@ -79,7 +79,7 @@ type ContentBlock = { type: "text"; text: string } | { type: "image"; source: { 
 type Opts = { model?: string; maxTokens?: number; timeoutMs?: number };
 
 async function callMessages(content: string | ContentBlock[], opts?: Opts): Promise<string> {
-  const client = getClient();
+  const client = await getClient();
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), opts?.timeoutMs ?? 120_000);
   try {
