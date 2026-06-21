@@ -19,6 +19,9 @@ import { claudeText, getTtcStats } from "@/server/claude";
 import { OPENSCAD_BIN as OPENSCAD } from "@/server/bin";
 import { getExact, findSimilar, putGeneration, type CachedGeneration, type GenCacheRequest } from "@/server/genCache";
 import { recordTurn, bumpStat } from "@/server/agentMemory";
+import { SemanticConventions } from "@/server/tracing";
+import { evaluateGeneration } from "@/server/evaluator";
+import { trace, SpanStatusCode } from "@opentelemetry/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -276,6 +279,15 @@ export async function POST(req: Request) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const enc = new TextEncoder();
+      // ── Arize: top-level generation span (wraps the entire pipeline) ──
+      const genTracer = trace.getTracer("claudware");
+      const genSpan = genTracer.startSpan("generate-pipeline");
+      genSpan.setAttribute(SemanticConventions.OPENINFERENCE_SPAN_KIND, "CHAIN");
+      genSpan.setAttribute(SemanticConventions.INPUT_VALUE, prompt);
+      genSpan.setAttribute("generation.engine", engine);
+      if (sessionId) genSpan.setAttribute(SemanticConventions.SESSION_ID, sessionId);
+      let hadRepair = false;
+
       // Capture the tail events as we stream them so a finished build can be cached in Redis for reuse.
       let capMesh: CachedGeneration["mesh"] | undefined;
       let capEstimate: CachedGeneration["estimate"];
@@ -613,6 +625,7 @@ export async function POST(req: Request) {
                   if (!fixed) throw e;
                   await renderStageBlender(fixed, stl, pyP, live, isFinalStage);
                   st.scad = fixed;
+                  hadRepair = true;
                 } else throw e;
               }
               if (!existsSync(stl)) throw new Error("no geometry produced");
@@ -634,7 +647,7 @@ export async function POST(req: Request) {
                 const fixed = await repairOpenscad(prompt, st.scad, res.err || "");
                 if (fixed) {
                   const res2 = await tryRenderOpenscad(fixed, stl, scadPath);
-                  if (res2.ok) { st.scad = fixed; await writeFile(WATCH, fixed); res = res2; }
+                  if (res2.ok) { st.scad = fixed; await writeFile(WATCH, fixed); res = res2; hadRepair = true; }
                 }
               }
               if (!res.ok) throw new Error(res.err || "no geometry produced");
@@ -712,6 +725,32 @@ export async function POST(req: Request) {
             send({ t: ts(), kind: "tool", name: "redis_memory", status: "done", detail: "cached to Redis · semantic vector index updated" });
           } catch { /* best-effort persistence */ }
         }
+
+        // ── Arize: close the generation span + run async evaluator ──
+        const durationMs = Date.now() - t0;
+        genSpan.setAttribute("generation.duration_ms", durationMs);
+        genSpan.setAttribute("generation.served_from_cache", servedFromCache);
+        genSpan.setAttribute("generation.had_repair", hadRepair);
+        if (capSummary) {
+          genSpan.setAttribute(SemanticConventions.OUTPUT_VALUE, capSummary.text);
+          genSpan.setAttribute("generation.resolved_engine", capSummary.engine ?? engine);
+        }
+        genSpan.setStatus({ code: SpanStatusCode.OK });
+        genSpan.end();
+
+        // Fire-and-forget evaluator (non-blocking — never delays the user's stream)
+        if (capSummary && !servedFromCache) {
+          evaluateGeneration({
+            prompt,
+            engine: capSummary.engine ?? engine,
+            summaryText: capSummary.text,
+            source: capSummary.source,
+            hadRepair,
+            servedFromCache,
+            durationMs,
+          }).catch(() => {});
+        }
+
         controller.close();
       }
     },
