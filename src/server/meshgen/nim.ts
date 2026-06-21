@@ -79,9 +79,9 @@ export const nimProvider: MeshGenProvider = {
       // giving up. A 500 fails FAST (~1s), so several retries are cheap and lift the hosted endpoint's ~1-in-3
       // success rate to ~90%+ — the difference between a real textured figure and the procedural fallback.
       let b64: string | null = null;
-      const MAX_TRIES = 8;
+      const MAX_TRIES = 5;
       for (let i = 0; i < MAX_TRIES && !b64; i++) {
-        if (i) await sleep(Math.min(1500 * i, 5000));
+        if (i) await sleep(Math.min(1000 * i, 3000));
         b64 = await requestGlb(req.prompt, req.seed ?? 0, ctrl.signal);
       }
       if (!b64) throw new Error(`nim unavailable after ${MAX_TRIES} retries (endpoint busy/500 or empty)`);

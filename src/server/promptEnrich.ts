@@ -221,7 +221,7 @@ export async function enrichPrompt(prompt: string): Promise<string> {
     `on a small round base". No scene, no background, no lighting talk, no printing talk.\n` +
     `Output ONLY the descriptor. Keep it UNDER 45 words.\n\nSubject: ${prompt}`;
   try {
-    const raw = await claudeText(instruction, { maxTokens: 800, timeoutMs: 30_000 });
+    const raw = await claudeText(instruction, { maxTokens: 200, timeoutMs: 30_000 });
     const out = raw.replace(/^["']|["']$/g, "").replace(/\s+/g, " ");
     // TRELLIS handles long prompts; cap generously so we never truncate mid-word but stay sane.
     return out.length >= 12 ? out.slice(0, 900) : prompt;
