@@ -1,4 +1,14 @@
-import { existsSync } from "node:fs";
+import { accessSync, constants, statSync } from "node:fs";
+
+/** True only for an existing, executable regular file (not a directory). */
+function isExe(p: string): boolean {
+  try {
+    accessSync(p, constants.X_OK);
+    return statSync(p).isFile();
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Resolve an external CLI binary robustly across machines.
@@ -12,8 +22,8 @@ import { existsSync } from "node:fs";
  */
 export function resolveBin(name: string, candidates: string[] = [], envVar?: string): string {
   const fromEnv = envVar ? process.env[envVar] : undefined;
-  if (fromEnv && existsSync(fromEnv)) return fromEnv;
-  for (const c of candidates) if (existsSync(c)) return c;
+  if (fromEnv && isExe(fromEnv)) return fromEnv;
+  for (const c of candidates) if (isExe(c)) return c;
   return name; // last resort: let execFile resolve it on PATH
 }
 

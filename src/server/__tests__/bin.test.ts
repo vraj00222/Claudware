@@ -21,4 +21,8 @@ describe("resolveBin", () => {
   it("returns the first candidate that exists", () => {
     expect(resolveBin("blender", ["/no/such/path", "/usr/bin/env", "/bin/sh"])).toBe("/usr/bin/env");
   });
+
+  it("skips directories and non-executable paths", () => {
+    expect(resolveBin("blender", ["/usr", "/tmp", "/usr/bin/env"])).toBe("/usr/bin/env");
+  });
 });
