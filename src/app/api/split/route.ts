@@ -3,7 +3,7 @@ import path from "node:path";
 import type { AgentEvent, SplitResult } from "@/lib/agentEvent";
 import { parseStlAuto, boundingBox, type Bed } from "@/server/printPlan";
 import { GENERIC_BED, BAMBU_A1 } from "@/server/printReady/bed";
-import { planSplitParts, renderSplitParts } from "@/server/split";
+import { planSplitParts, renderSplitParts, renderExplodedPreview } from "@/server/split";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,6 +67,11 @@ export async function POST(req: Request) {
         send({ t: ts(), kind: "tool", name: "export", status: "running", detail: `cutting ${plan.parts.length} parts with push-fit connectors (Ø${plan.connector.pegDiameter}mm pegs, ${plan.connector.clearance}mm clearance)…` });
 
         const rendered = await renderSplitParts(mesh, plan, jobDir);
+        let previewUrl: string | undefined;
+        try {
+          const explodedPath = await renderExplodedPreview(plan, rendered, jobDir);
+          previewUrl = `/generated/${jobId}/${path.basename(explodedPath)}`;
+        } catch { /* preview is best-effort; per-part STLs still download */ }
 
         const result: SplitResult = {
           mode: plan.mode,
@@ -83,6 +88,7 @@ export async function POST(req: Request) {
           reason: plan.reason,
           guide: plan.guide,
           wholeUrl: meshUrl,
+          previewUrl,
         };
         send({ t: ts(), kind: "tool", name: "export", status: "done", detail: `${rendered.length} parts ready — ${result.connector.count} push-fit peg(s) per seam` });
         send({ t: ts(), kind: "split", result });

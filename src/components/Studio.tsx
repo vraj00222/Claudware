@@ -3,7 +3,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { AgentEvent } from "@/lib/agentEvent";
 import { initialViewModel, reduce, deriveStages, type ViewModel, type Mode, type FeedRow } from "@/lib/viewModel";
 import type { Player } from "@/lib/mockStream";
-import { playAgentStream, playImportStream, playMakeWithAiStream, playTransformStream, playPrepareStream, type RequestEngine } from "@/lib/agentStream";
+import { playAgentStream, playImportStream, playMakeWithAiStream, playTransformStream, playPrepareStream, playSplitStream, type RequestEngine } from "@/lib/agentStream";
 import { parseSizeEdit } from "@/server/sizeEdit";
 import { playSearchStream } from "@/lib/searchStream";
 import { fetchClarify, type Question } from "@/lib/clarify";
@@ -18,6 +18,7 @@ import { AgentFeed } from "./AgentFeed";
 import { PrintCenter } from "./PrintCenter";
 import { PrintPlan } from "./PrintPlan";
 import { PrintReadyPanel } from "./PrintReadyPanel";
+import { PrintPartsPanel } from "./PrintPartsPanel";
 import { VersionRail } from "./VersionRail";
 import { RenderLoader } from "./RenderLoader";
 import { ClarifyCard } from "./ClarifyCard";
@@ -53,6 +54,8 @@ export function Studio() {
   const [booting, setBooting] = useState(true);
   const [rendering, setRendering] = useState(false);
   const [preparing, setPreparing] = useState(false); // a "Prepare for print" (/api/prepare) run is in flight
+  const [splitting, setSplitting] = useState(false); // a "Print in parts" (/api/split) run is in flight
+  const [splitView, setSplitView] = useState<"whole" | "parts">("whole"); // viewport: whole model vs exploded parts
   const [userPrompt, setUserPrompt] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMsg[]>([]); // the continuous conversation thread
   const [user, setUser] = useState<AuthUser | null>(null); // signed-in account → TopBar pill + /profile
@@ -70,6 +73,7 @@ export function Studio() {
 
   const playerRef = useRef<Player | null>(null);
   const preparePlayer = useRef<Player | null>(null); // the in-flight "Prepare for print" stream
+  const splitPlayer = useRef<Player | null>(null);   // the in-flight "Print in parts" stream
   const printTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   // The AUTHORITATIVE current project — the single source of truth for persistence. Mutated
   // deliberately (append/update a version, sync messages) and saved via persist(); this replaces the
@@ -118,10 +122,14 @@ export function Studio() {
     playerRef.current = null;
     preparePlayer.current?.cancel();
     preparePlayer.current = null;
+    splitPlayer.current?.cancel();
+    splitPlayer.current = null;
     if (printTimer.current) { clearInterval(printTimer.current); printTimer.current = null; }
     building.current = false;
     setRendering(false);
     setPreparing(false);
+    setSplitting(false);
+    setSplitView("whole");
   }, []);
 
   // Open a saved project (no regeneration) — shows its latest mesh + stats, ready to refine in place.
@@ -500,6 +508,25 @@ export function Studio() {
     });
   }, [vm.meshUrl, curVersion, preparing, persist]);
 
+  // PRINT IN PARTS (/api/split): cut the finished mesh into push-fit pieces. The `split` package streams
+  // back (per-part STLs + exact connector measurements + an exploded preview mesh) and the viewport flips
+  // to the exploded preview so the user sees the print-in-parts version immediately.
+  const splitForPrint = useCallback((parts: number) => {
+    const mesh = vm.meshUrl;
+    if (!mesh || splitting) return;
+    setSplitting(true);
+    splitPlayer.current?.cancel();
+    splitPlayer.current = playSplitStream(mesh, { parts }, (event) => {
+      if (event.kind === "split") setSplitView("parts");
+      else if (event.kind === "summary") setSplitting(false);
+      dispatch({ type: "event", event });
+    });
+  }, [vm.meshUrl, splitting]);
+
+  // In PARTS view show the exploded preview mesh; otherwise the whole model. Pure selection — the reducer's
+  // vm.meshUrl (the whole mesh) is never mutated, so toggling back to Whole is instant.
+  const viewportMeshUrl = splitView === "parts" && vm.split?.previewUrl ? vm.split.previewUrl : vm.meshUrl;
+
   const stages = deriveStages(vm.phase);
   const showConvo = !!userPrompt || (vm.phase !== "boot" && vm.phase !== "empty");
   // Reference-image upload isn't built yet (future Novita photo→mesh path), so don't show the
@@ -563,7 +590,7 @@ export function Studio() {
               <RenderLoader status={userPrompt ? "Designing your model" : "Rendering preview"} sub="generating geometry — this can take a moment" />
             </div>
           ) : (
-            <Viewport phase={vm.phase} marker={vm.marker} gizmo={vm.phase === "complete" ? "translate" : null} loaderStatus={loaderStatus} meshUrl={vm.meshUrl} glbUrl={vm.glbUrl} textured={vm.textured} supportsNeeded={vm.printPlan?.supports.needed ?? false} pillars={vm.printPlan?.supports.pillars ?? null} supportBaseZ={vm.printPlan?.supports.baseZ ?? null} />
+            <Viewport phase={vm.phase} marker={vm.marker} gizmo={vm.phase === "complete" ? "translate" : null} loaderStatus={loaderStatus} meshUrl={viewportMeshUrl} glbUrl={splitView === "parts" ? null : vm.glbUrl} textured={splitView === "parts" ? false : vm.textured} supportsNeeded={splitView === "parts" ? false : (vm.printPlan?.supports.needed ?? false)} pillars={splitView === "parts" ? null : (vm.printPlan?.supports.pillars ?? null)} supportBaseZ={splitView === "parts" ? null : (vm.printPlan?.supports.baseZ ?? null)} />
           )}
           <VersionRail current={curVersion} count={versionCount} onPick={pickVersion} />
         </div>
@@ -571,6 +598,14 @@ export function Studio() {
           <AgentFeed rows={vm.rows} engine={engineSel} onPickEngine={(e) => { setEngineSel(e); setMode(displayMode(e)); }} cleanInBlender={cleanInBlender} onToggleClean={setCleanInBlender} miniFrame={miniFrame} />
           <PrintCenter print={vm.print} estimate={vm.estimate} rippleKey={rippleKey} onSend={sendPrint} />
           <PrintPlan plan={vm.printPlan} />
+          <PrintPartsPanel
+            split={vm.split}
+            canSplit={vm.phase === "complete" && !!vm.meshUrl}
+            splitting={splitting}
+            view={splitView}
+            onSplit={splitForPrint}
+            onSetView={setSplitView}
+          />
           <PrintReadyPanel
             readiness={vm.readiness}
             parts={projectRef.current?.versions[curVersion]?.parts ?? null}
