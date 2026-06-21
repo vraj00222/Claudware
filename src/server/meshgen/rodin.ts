@@ -1,6 +1,6 @@
 import path from "node:path";
 import { existsSync, statSync } from "node:fs";
-import { blenderSend, blenderLiveAvailable } from "@/server/blender";
+import { blenderSend, blenderLiveAvailable, stlExportPy } from "@/server/blender";
 import type { MeshGenProvider, MeshGenRequest, MeshGenResult } from "./types";
 
 /**
@@ -58,7 +58,7 @@ for o in targets:
     if o: o.select_set(True)
 bpy.context.view_layer.objects.active = targets[0] if targets else None
 if targets:
-    bpy.ops.wm.stl_export(filepath=${JSON.stringify(stlPath)}, export_selected_objects=True, ascii_format=True, up_axis='Z', forward_axis='Y')
+${stlExportPy(JSON.stringify(stlPath), { selected: true, indent: 4 })}
     bpy.ops.export_scene.gltf(filepath=${JSON.stringify(glbPath)}, export_format='GLB', use_selection=True)
 `;
     const exp = (await blenderSend({ type: "execute_code", params: { code } }, 120_000)) as Res;

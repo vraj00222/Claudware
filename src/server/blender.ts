@@ -24,6 +24,32 @@ import { BLENDER_BIN as BLENDER } from "./bin";
 
 const execFileP = promisify(execFile);
 
+/** Python that exports the current selection to an ASCII STL, working on BOTH Blender 4.x and 3.x.
+ *  4.x uses `bpy.ops.wm.stl_export`; 3.x has no such operator (it's `bpy.ops.export_mesh.stl` with
+ *  different kwarg names), so on 3.x the 4.x call raises and we fall back. Without this, every STL export
+ *  silently produced nothing on Blender 3.x → NVIDIA GLB→STL and the Blender engine both "made no geometry".
+ *  `pathExpr` must be an already-quoted Python string literal (e.g. JSON.stringify(stlPath)). */
+export function stlExportPy(pathExpr: string, opts: { selected?: boolean; applyModifiers?: boolean; scale?: number; indent?: number } = {}): string {
+  const sel = opts.selected ?? true;
+  const am = opts.applyModifiers ?? false;
+  const sc = opts.scale;
+  const a4 = [`filepath=${pathExpr}`, ...(sel ? ["export_selected_objects=True"] : []), ...(am ? ["apply_modifiers=True"] : []),
+    "ascii_format=True", "up_axis='Z'", "forward_axis='Y'", ...(sc != null ? [`global_scale=${sc}`] : [])].join(", ");
+  const a3 = [`filepath=${pathExpr}`, ...(sel ? ["use_selection=True"] : []), ...(am ? ["use_mesh_modifiers=True"] : []),
+    "ascii=True", "axis_up='Z'", "axis_forward='Y'", ...(sc != null ? [`global_scale=${sc}`] : [])].join(", ");
+  const pad = " ".repeat(opts.indent ?? 0);
+  return [
+    `try:`,
+    `    bpy.ops.wm.stl_export(${a4})`,
+    `except Exception:`,
+    `    try:`,
+    `        bpy.ops.preferences.addon_enable(module='io_mesh_stl')`,
+    `    except Exception:`,
+    `        pass`,
+    `    bpy.ops.export_mesh.stl(${a3})`,
+  ].map((l) => pad + l).join("\n");
+}
+
 // The bpy plan writer is a single text-generation call → the Anthropic Messages API (Sonnet, fast). The old
 // `claude -p` agent CLI loaded MCP servers + reasoned for minutes → blew past the 240s timeout → generic
 // fallback creature; the raw API returns valid bpy stages in ~20-60s. Env-overridable model.
@@ -131,7 +157,7 @@ if _ms3:
     bpy.ops.object.select_all(action='DESELECT')
     for _o in _ms3: _o.select_set(True)
     bpy.context.view_layer.objects.active = _ms3[0]
-    bpy.ops.wm.stl_export(filepath=${JSON.stringify(outStl)}, export_selected_objects=True, apply_modifiers=True, ascii_format=True, up_axis='Z', forward_axis='Y', global_scale=1.0)
+${stlExportPy(JSON.stringify(outStl), { selected: true, applyModifiers: true, scale: 1.0, indent: 4 })}
     print('CLEAN_OK')
 else:
     print('CLEAN_EMPTY')
@@ -236,10 +262,7 @@ if _meshes:
     for _o in _meshes:
         _o.select_set(True)
     bpy.context.view_layer.objects.active = _meshes[0]
-    bpy.ops.wm.stl_export(
-        filepath=${p}, export_selected_objects=True, apply_modifiers=True,
-        ascii_format=True, up_axis='Z', forward_axis='Y', global_scale=1.0,
-    )
+${stlExportPy(p, { selected: true, applyModifiers: true, scale: 1.0, indent: 4 })}
     print('STL_OK', ${p})
 else:
     print('STL_EMPTY')
