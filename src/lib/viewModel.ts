@@ -1,4 +1,4 @@
-import type { AgentEvent, PrintPlan, PrintReadiness } from "./agentEvent";
+import type { AgentEvent, PrintPlan, PrintReadiness, SplitResult } from "./agentEvent";
 
 export type Phase = "boot" | "empty" | "forming" | "inspecting" | "complete" | "studio" | "printing";
 export type Mode = "parametric" | "figure" | "hybrid";
@@ -30,6 +30,8 @@ export interface ViewModel {
   printPlan: PrintPlan | null;
   /** Print-Readiness v2 package (null until a `printready` event arrives — the "Prepare for print" action) */
   readiness: PrintReadiness | null;
+  /** Split-for-print result — the model cut into push-fit parts (null until a `split` event arrives) */
+  split: SplitResult | null;
   /** URL of the live mesh to render (set by streamed `mesh` events); null = use fixture */
   meshUrl: string | null;
   /** textured GLB preview URL for meshgen results (null = render the STL geometry) */
@@ -52,6 +54,7 @@ export const initialViewModel: ViewModel = {
   estimate: null,
   printPlan: null,
   readiness: null,
+  split: null,
   meshUrl: null,
   glbUrl: null,
   textured: false,
@@ -121,6 +124,8 @@ export function reduce(vm: ViewModel, e: AgentEvent): ViewModel {
       return { ...vm, printPlan: e.plan };
     case "printready":
       return { ...vm, readiness: e.readiness };
+    case "split":
+      return { ...vm, split: e.result };
   }
 }
 

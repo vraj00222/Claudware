@@ -18,6 +18,9 @@ export type AgentEvent =
   // Print-Readiness v2 — the result of the per-version "Prepare for print" action (diagnose/orient/export).
   | { t: string; kind: "printready"; readiness: PrintReadiness }
   | { t: string; kind: "estimate"; grams: number; minutes: number; layers: number; material: string }
+  // Split-for-print: the model cut into printable parts joined by push-fit connectors. Carries each part's
+  // own STL URL + the exact connector measurements (the "no compromise" fit) + a plain join guide.
+  | { t: string; kind: "split"; result: SplitResult }
   // `source`/`engine` carry the final recipe so the client can save it on the version and
   // refine it IN PLACE next time (edit, not regenerate). `meshUrl` is the DURABLE InsForge Storage
   // URL of the finished mesh (survives restarts/redeploys); the per-stage `mesh` events still use
@@ -37,6 +40,25 @@ export interface PrintPlan {
   seams: { axis: "x" | "y" | "z"; at: number }[];
   supports: { needed: boolean; reason: string };
   download: { stlUrl: string; storageUrl?: string };
+}
+
+/** Split-for-print readout — the model cut into push-fit parts, rendered by the Print Plan panel + viewport. */
+export interface SplitPartInfo {
+  index: number;
+  label: string;
+  url: string;       // per-part STL URL
+  w: number;
+  d: number;
+  h: number;
+}
+export interface SplitResult {
+  mode: "auto" | "forced";
+  axis: "x" | "y" | "z";
+  parts: SplitPartInfo[];
+  connector: { type: "push-fit"; pegDiameter: number; socketDiameter: number; clearance: number; pegLength: number; count: number };
+  reason: string;
+  guide: string;
+  wholeUrl?: string; // the original one-piece mesh, so the UI can toggle Whole ↔ Parts
 }
 
 /* ───────────────────────── Print-Readiness v2 (the "Prepare for print" package) ─────────────────────────
