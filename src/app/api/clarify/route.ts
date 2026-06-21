@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { classifyPrompt, heuristicQuestions, claudeQuestions } from "@/server/clarify";
+import { Sentry, incrementMetric } from "@/server/sentry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,5 +18,7 @@ export async function POST(req: Request) {
   const smart = promptClass === "figure" || promptClass === "character" ? await claudeQuestions(prompt) : [];
   const sizeQ = heuristicQuestions(prompt).find((q) => q.id === "size")!;
   const questions = smart.length ? [...smart, sizeQ] : heuristicQuestions(prompt);
+  incrementMetric("clarify.requests", 1, { class: promptClass });
+  Sentry.logger.info("Clarify questions generated", { promptClass, count: questions.length });
   return NextResponse.json({ promptClass, questions });
 }

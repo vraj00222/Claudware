@@ -1,6 +1,7 @@
 import { writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { captureError, incrementMetric } from "@/server/sentry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,8 +19,10 @@ export async function POST(req: Request) {
     await mkdir(UPLOADS, { recursive: true });
     const name = `${Date.now().toString(36)}.${ext}`;
     await writeFile(path.join(UPLOADS, name), Buffer.from(await file.arrayBuffer()));
+    incrementMetric("upload.completed");
     return NextResponse.json({ url: `/generated/uploads/${name}`, name: file.name });
   } catch (e) {
+    captureError(e, { route: "upload" });
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }

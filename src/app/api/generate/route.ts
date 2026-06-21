@@ -22,6 +22,7 @@ import { recordTurn, bumpStat } from "@/server/agentMemory";
 import { SemanticConventions } from "@/server/tracing";
 import { evaluateGeneration } from "@/server/evaluator";
 import { trace, SpanStatusCode } from "@opentelemetry/api";
+import { Sentry, recordMetric, incrementMetric, captureError } from "@/server/sentry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -702,6 +703,7 @@ export async function POST(req: Request) {
         }
         await finish(lastStl, lastMeshUrl, engineName, `${plan.object} ready — ${plan.stages.length} build steps`, lastSource, plan.stages.length);
       } catch (err) {
+        captureError(err, { prompt, engine, jobId });
         send({ t: ts(), kind: "tool", name: "render_preview", status: "error", detail: (err as Error).message.slice(0, 120) });
       } finally {
         // Persist the finished build to Redis so the next identical/similar prompt is reused instantly.
@@ -737,6 +739,21 @@ export async function POST(req: Request) {
         }
         genSpan.setStatus({ code: SpanStatusCode.OK });
         genSpan.end();
+
+        // ── Sentry: pipeline metrics + structured log ──
+        recordMetric("generate.duration", durationMs, { engine: capSummary?.engine ?? engine });
+        incrementMetric("generate.completed", 1, {
+          engine: capSummary?.engine ?? engine,
+          cache: servedFromCache ? "hit" : "miss",
+          repaired: hadRepair ? "yes" : "no",
+        });
+        Sentry.logger.info("Generation pipeline completed", {
+          prompt: prompt.slice(0, 80),
+          engine: capSummary?.engine ?? engine,
+          durationMs,
+          servedFromCache,
+          hadRepair,
+        });
 
         // Fire-and-forget evaluator (non-blocking — never delays the user's stream)
         if (capSummary && !servedFromCache) {
