@@ -20,10 +20,9 @@ import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import type { GenPlan, Stage } from "./openscad";
 import { claudeText } from "./claude";
+import { BLENDER_BIN as BLENDER } from "./bin";
 
 const execFileP = promisify(execFile);
-const bin = (abs: string, name: string) => (existsSync(abs) ? abs : name);
-const BLENDER = bin("/opt/homebrew/bin/blender", "blender");
 
 // The bpy plan writer is a single text-generation call → the Anthropic Messages API (Sonnet, fast). The old
 // `claude -p` agent CLI loaded MCP servers + reasoned for minutes → blew past the 240s timeout → generic

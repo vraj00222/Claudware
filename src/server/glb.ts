@@ -3,10 +3,9 @@ import { promisify } from "node:util";
 import { writeFile } from "node:fs/promises";
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
+import { BLENDER_BIN as BLENDER } from "./bin";
 
 const execFileP = promisify(execFile);
-const bin = (abs: string, name: string) => (existsSync(abs) ? abs : name);
-const BLENDER = bin("/opt/homebrew/bin/blender", "blender");
 
 /**
  * Import a .glb, AUTO-CLEAN it for printing, and export an ascii STL (Z-up, so estimateFromStl/

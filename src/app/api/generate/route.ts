@@ -16,15 +16,13 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import type { AgentEvent } from "@/lib/agentEvent";
 import { claudeText, getTtcStats } from "@/server/claude";
+import { OPENSCAD_BIN as OPENSCAD } from "@/server/bin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const execFileP = promisify(execFile);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-const bin = (abs: string, name: string) => (existsSync(abs) ? abs : name);
-const OPENSCAD = bin("/opt/homebrew/bin/openscad", "openscad");
 
 const PUBLIC = path.join(process.cwd(), "public", "generated");
 const WATCH = path.join(process.cwd(), "tools", "_watch", "model.scad"); // open this in OpenSCAD to watch live
