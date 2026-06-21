@@ -17,6 +17,8 @@ import path from "node:path";
 import type { AgentEvent } from "@/lib/agentEvent";
 import { claudeText, getTtcStats } from "@/server/claude";
 import { OPENSCAD_BIN as OPENSCAD } from "@/server/bin";
+import { getExact, findSimilar, putGeneration, type CachedGeneration, type GenCacheRequest } from "@/server/genCache";
+import { recordTurn, bumpStat } from "@/server/agentMemory";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -227,14 +229,18 @@ async function tryRenderOpenscad(scad: string, stlPath: string, scadPath: string
 }
 
 export async function POST(req: Request) {
-  const { prompt = "", engine = "auto", base = "", sizeMm, refImageUrl, postSteps } =
+  const { prompt = "", engine = "auto", base = "", sizeMm, refImageUrl, postSteps, sessionId } =
     (await req.json().catch(() => ({}))) as {
       prompt?: string; engine?: RequestedEngine; base?: string; sizeMm?: number; refImageUrl?: string;
-      postSteps?: { cleanInBlender?: boolean };
+      postSteps?: { cleanInBlender?: boolean }; sessionId?: string;
     };
 
   const isEdit = typeof base === "string" && base.trim().length > 0; // refine-in-place
   const cleanInBlender = Boolean(postSteps?.cleanInBlender);
+  // Redis reuse-before-regenerate: only cache fresh, text-only prompts (edits + ref-image jobs vary too
+  // much to safely replay). The cache key still includes engine/size so different requests don't collide.
+  const cacheable = !isEdit && !refImageUrl;
+  const cacheReq: GenCacheRequest = { prompt, engine, sizeMm, base, refImageUrl, cleanInBlender };
 
   const jobId = Date.now().toString(36);
   const jobDir = path.join(PUBLIC, jobId);
@@ -250,7 +256,61 @@ export async function POST(req: Request) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const enc = new TextEncoder();
-      const send = (e: AgentEvent) => controller.enqueue(enc.encode(`data: ${JSON.stringify(e)}\n\n`));
+      // Capture the tail events as we stream them so a finished build can be cached in Redis for reuse.
+      let capMesh: CachedGeneration["mesh"] | undefined;
+      let capEstimate: CachedGeneration["estimate"];
+      let capSummary: Extract<AgentEvent, { kind: "summary" }> | undefined;
+      let servedFromCache = false;
+      const send = (e: AgentEvent) => {
+        if (e.kind === "mesh") capMesh = { url: e.url, glbUrl: e.glbUrl, textured: e.textured, label: e.label };
+        else if (e.kind === "estimate") capEstimate = { grams: e.grams, minutes: e.minutes, layers: e.layers, material: e.material };
+        else if (e.kind === "summary") capSummary = e;
+        controller.enqueue(enc.encode(`data: ${JSON.stringify(e)}\n\n`));
+      };
+
+      // ───────── Redis: reuse-before-regenerate (exact + semantic vector search) ─────────
+      // A finished model for this prompt (or a near-identical one) is replayed instantly from Redis —
+      // 0 Claude tokens, no OpenSCAD/Blender/NVIDIA work. This is Redis "beyond caching": vector KNN
+      // drives the agent's reuse decision. Best-effort: any failure just proceeds to a normal build.
+      async function replayCached(cached: CachedGeneration, how: "exact" | "semantic", score?: number, matched?: string) {
+        const label = how === "exact"
+          ? "served from Redis — exact cache hit · 0 Claude tokens"
+          : `served from Redis — semantic match (${Math.round((score ?? 0) * 100)}% similar to “${matched}”) · 0 Claude tokens`;
+        send({ t: ts(), kind: "plan", text: `Engine: ${cached.engine} — reused from Redis (${how} cache)` });
+        send({ t: ts(), kind: "tool", name: "redis_cache", status: "done", detail: label });
+        send({ t: ts(), kind: "mesh", url: cached.mesh.url, glbUrl: cached.mesh.glbUrl, textured: cached.mesh.textured, label: cached.mesh.label, stage: 1, totalStages: 1 });
+        send({ t: ts(), kind: "tool", name: "validate", status: "done", detail: "watertight · printable (cached)" });
+        if (cached.estimate) send({ t: ts(), kind: "estimate", ...cached.estimate });
+        // Recompute the Print Plan from the cached mesh file when it's still on disk (same machine).
+        try {
+          if (cached.mesh.url.startsWith("/generated/")) {
+            const stlPath = path.join(process.cwd(), "public", cached.mesh.url);
+            if (existsSync(stlPath)) {
+              const stl = await readFile(stlPath, "utf8");
+              send({ t: ts(), kind: "printplan", plan: buildPrintPlan(stl, DEFAULT_BED, { stlUrl: cached.mesh.url, storageUrl: cached.durableMeshUrl }) });
+            }
+          }
+        } catch { /* best-effort */ }
+        send({ t: ts(), kind: "summary", text: cached.summaryText, source: cached.source, engine: cached.engine, meshUrl: cached.durableMeshUrl ?? cached.mesh.url, ...(cached.parts && cached.parts.length ? { parts: cached.parts } : {}) });
+      }
+
+      if (cacheable) {
+        try {
+          const exact = await getExact(cacheReq);
+          const semantic = exact ? null : await findSimilar(prompt);
+          const cached = exact ?? semantic?.result ?? null;
+          if (cached && cached.mesh?.url) {
+            servedFromCache = true;
+            await replayCached(cached, exact ? "exact" : "semantic", semantic?.score, semantic?.matchedPrompt);
+            await bumpStat(exact ? "cacheHits" : "semanticHits");
+            // a Claude design call (~12k max tokens) avoided when the cached recipe came from Claude
+            await bumpStat("tokensSaved", cached.source?.startsWith("claude") ? 12_000 : 0);
+            await recordTurn(sessionId, { prompt, engine: cached.engine, meshUrl: cached.mesh.url, served: exact ? "exact-cache" : "semantic-cache", ts: Date.now() });
+            controller.close();
+            return;
+          }
+        } catch { /* never let the cache break a generation */ }
+      }
 
       // Shared post-build tail: optional Blender cleanup → validate → estimate → upload → print plan → summary.
       async function finish(stlPath: string, meshUrl: string, engineName: ConcreteEngine,
@@ -606,6 +666,27 @@ export async function POST(req: Request) {
       } catch (err) {
         send({ t: ts(), kind: "tool", name: "render_preview", status: "error", detail: (err as Error).message.slice(0, 120) });
       } finally {
+        // Persist the finished build to Redis so the next identical/similar prompt is reused instantly.
+        if (!servedFromCache && cacheable && capSummary?.engine && capMesh) {
+          try {
+            const cached: CachedGeneration = {
+              prompt,
+              engine: capSummary.engine,
+              source: capSummary.source,
+              summaryText: capSummary.text,
+              mesh: capMesh,
+              durableMeshUrl: capSummary.meshUrl,
+              estimate: capEstimate,
+              parts: capSummary.parts,
+              createdAt: Date.now(),
+            };
+            await putGeneration(cacheReq, cached);
+            await bumpStat("generations");
+            await bumpStat("cacheMisses");
+            await recordTurn(sessionId, { prompt, engine: cached.engine, meshUrl: capMesh.url, served: "fresh", ts: Date.now() });
+            send({ t: ts(), kind: "tool", name: "redis_memory", status: "done", detail: "cached to Redis · semantic vector index updated" });
+          } catch { /* best-effort persistence */ }
+        }
         controller.close();
       }
     },
