@@ -13,7 +13,15 @@ import type { PrintReadiness, ExportFormat, RepairAction } from "@/lib/agentEven
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
-export function buildPrintReadiness(tris: Tri[], bed: PrinterBed, formats: ExportFormat[]): PrintReadiness {
+/** Optional real-slice numbers (from the slicer) that override the heuristic time/grams in the recipe. */
+export interface EstimateOverride { minutes?: number; grams?: number }
+
+export function buildPrintReadiness(
+  tris: Tri[],
+  bed: PrinterBed,
+  formats: ExportFormat[],
+  estimateOverride?: EstimateOverride,
+): PrintReadiness {
   const bbox = boundingBox(tris);
   const dimensions = { w: round1(bbox.w), d: round1(bbox.d), h: round1(bbox.h) };
   const diag = diagnose(tris, bed);
@@ -45,6 +53,8 @@ export function buildPrintReadiness(tris: Tri[], bed: PrinterBed, formats: Expor
   if (floaters && floaters.level !== "ok" && decompose.strategy !== "parts") repairs.push({ id: "floaters", label: "Remove stray floaters", applied: false, detail: floaters.detail });
 
   const recipe = buildPrintRecipe(tris, bed);
+  if (estimateOverride?.minutes != null) recipe.estimateMinutes = estimateOverride.minutes;
+  if (estimateOverride?.grams != null) recipe.estimateGrams = estimateOverride.grams;
 
   const supportNote = recipe.supportStyle === "none" ? "no supports needed"
     : `${recipe.supportStyle} supports at ${recipe.supportAngle}°`;

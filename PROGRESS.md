@@ -31,7 +31,14 @@
       sign, ornament, snowflake, chess, "that says…") now route to OpenSCAD (fast/watertight) not slow NVIDIA.
 - [x] PR #14 — Blender STL export now works on Blender 3.x AND 4.x (shared stlExportPy: wm.stl_export →
       export_mesh.stl fallback). FIXES NVIDIA GLB→STL + the Blender engine producing empty geometry on 3.x.
-- [x] Blueprint suggestion: apt openscad + blender + python3-numpy (glTF importer needs numpy) + clone BOSL2.
+- [x] REAL SLICER (this PR) — "Prepare for print" now shells out to PrusaSlicer console mode (binary+flag-gated
+      via `src/server/bin.ts` resolveSlicerBin + `ENABLE_SLICER`) to produce ACTUAL G-code: real supports,
+      real slice time, real filament grams, + a G-code download. `src/server/slicer.ts` (sliceStl never throws,
+      120s subprocess timeout, cleans temp STL) + pure `parseGcodeEstimate` (PrusaSlicer + Cura comment formats,
+      unit-tested). ZERO-tool fallback unchanged: when no slicer installed the heuristic path is byte-identical.
+      Verified: 20mm cube STL → G-code → 30min / 3.7g / tree supports.
+- [x] Blueprint suggestion: apt openscad + blender + python3-numpy (glTF importer needs numpy) + clone BOSL2
+      + `apt-get install -y prusa-slicer` (real slicing; falls back to heuristic when absent).
 - Sweep (10 prompts, auto): OpenSCAD path flawless; NVIDIA-routed prompts gated on the hosted TRELLIS endpoint
   (intermittently slow/erroring server-side — outside our code). OPEN Q for Vraj: change unknown→default from
   NVIDIA to OpenSCAD given endpoint flakiness?
