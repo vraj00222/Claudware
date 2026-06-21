@@ -6,6 +6,7 @@ import { STLLoader, GLTFLoader } from "three-stdlib";
 import * as THREE from "three";
 import { C, FONT } from "@/design/tokens";
 import type { Phase, Marker } from "@/lib/viewModel";
+import type { SupportPillar } from "@/lib/agentEvent";
 import { PrinterLoader } from "@/components/PrinterLoader";
 
 export interface ViewportProps {
@@ -19,6 +20,12 @@ export interface ViewportProps {
   /** textured GLB preview (meshgen results) — rendered with materials when present */
   glbUrl?: string | null;
   textured?: boolean;
+  /** Support pillars (mm, model coords) under the model's overhangs — drives the supports overlay. */
+  pillars?: SupportPillar[] | null;
+  /** Z of the model floor in mm (pillar bases sit here). */
+  supportBaseZ?: number | null;
+  /** Whether the current model was flagged as needing supports → enables the "Show supports" toggle. */
+  supportsNeeded?: boolean;
 }
 
 function FormingStand({ geom, halfH, phase, marker }: { geom: THREE.BufferGeometry; halfH: number; phase: Phase; marker: Marker | null }) {
@@ -81,25 +88,66 @@ function bedGrid(y: number) {
   return <Grid args={[400, 400]} cellSize={10} cellColor={C.layer} sectionColor={C.border} fadeDistance={400} fadeStrength={1.5} infiniteGrid position={[0, y, 0]} />;
 }
 
+/** Semi-transparent terracotta support pillars under the model's overhangs. Pillars arrive in mm
+ *  (model coords); we apply the SAME center+scale the STL got (so they line up with the rendered mesh)
+ *  inside a Z-up group rotated to match the model. Slightly tapered (cone-ish tip) + low opacity so
+ *  they read as supports, not part of the print. */
+function Supports({ pillars, baseZ, center, scale }: {
+  pillars: SupportPillar[]; baseZ: number; center: THREE.Vector3; scale: number;
+}) {
+  const material = useMemo(
+    () => new THREE.MeshStandardMaterial({
+      color: C.accent, transparent: true, opacity: 0.42, roughness: 0.55, metalness: 0, depthWrite: false,
+    }),
+    [],
+  );
+  useEffect(() => () => material.dispose(), [material]);
+  const zBase = (baseZ - center.z) * scale;
+  return (
+    // local Z-up frame matching the model mesh (rotated so local Z → world Y / "up")
+    <group rotation={[-Math.PI / 2, 0, 0]}>
+      {pillars.map((p, i) => {
+        const x = (p.x - center.x) * scale;
+        const y = (p.y - center.y) * scale;
+        const zTop = (p.topZ - center.z) * scale;
+        const h = Math.max(0.4, zTop - zBase);
+        // cylinder's native axis is Y → rotate +90° about X so it stands along local Z (the build "up").
+        return (
+          <mesh key={i} material={material} position={[x, y, zBase + h / 2]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.45, 0.75, h, 10]} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
 /** Loads + renders the current build mesh IMPERATIVELY: the previous stage stays on screen
  *  until the next STL finishes loading, so swapping stages never blanks/flickers. */
-function LoadedModel({ url, phase, marker, gizmo }: { url: string; phase: Phase; marker: Marker | null; gizmo: ViewportProps["gizmo"] }) {
-  const [data, setData] = useState<{ geom: THREE.BufferGeometry; halfH: number } | null>(null);
+function LoadedModel({ url, phase, marker, gizmo, showSupports, pillars, supportBaseZ }: {
+  url: string; phase: Phase; marker: Marker | null; gizmo: ViewportProps["gizmo"];
+  showSupports: boolean; pillars: SupportPillar[] | null; supportBaseZ: number | null;
+}) {
+  const [data, setData] = useState<{ geom: THREE.BufferGeometry; halfH: number; center: THREE.Vector3; scale: number } | null>(null);
   useEffect(() => {
     let alive = true;
     new STLLoader().loadAsync(url).then((g) => {
       if (!alive) return;
-      // Center (idempotent). OpenSCAD STL is Z-up; mesh is rotated -90° about X so local Z → world Y.
-      g.center();
+      // Capture the ORIGINAL (mm) bbox before mutating so the supports overlay can apply the SAME
+      // center+scale and line up with the rendered mesh. OpenSCAD STL is Z-up; mesh is rotated -90°
+      // about X so local Z → world Y.
       g.computeBoundingBox();
-      // Normalize ON-SCREEN size so any model frames the same way the camera + OrbitControls expect —
-      // a 254 mm mug otherwise renders at 254 world units and can't be zoomed out to (the GLB path
-      // already normalizes the same way). Real mm are shown in the Print Plan panel, not implied here.
+      const center = g.boundingBox!.getCenter(new THREE.Vector3());
       const size = g.boundingBox!.getSize(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z) || 1;
-      g.scale(70 / maxDim, 70 / maxDim, 70 / maxDim);
+      const scale = 70 / maxDim;
+      // Center (idempotent). Normalize ON-SCREEN size so any model frames the same way the camera +
+      // OrbitControls expect — a 254 mm mug otherwise renders at 254 world units and can't be zoomed
+      // out to. Real mm are shown in the Print Plan panel, not implied here.
+      g.center();
+      g.scale(scale, scale, scale);
       g.computeBoundingBox();
-      setData({ geom: g, halfH: g.boundingBox!.max.z });
+      setData({ geom: g, halfH: g.boundingBox!.max.z, center, scale });
     }).catch(() => { /* keep previous geometry on load error */ });
     return () => { alive = false; };
   }, [url]);
@@ -109,6 +157,9 @@ function LoadedModel({ url, phase, marker, gizmo }: { url: string; phase: Phase;
   return (
     <>
       {gizmo ? <TransformControls mode={gizmo}>{stand}</TransformControls> : stand}
+      {showSupports && pillars && pillars.length > 0 && (
+        <Supports pillars={pillars} baseZ={supportBaseZ ?? 0} center={data.center} scale={data.scale} />
+      )}
       {bedGrid(-data.halfH)}
     </>
   );
@@ -164,17 +215,42 @@ function LoadedGlb({ url }: { url: string }) {
   );
 }
 
-function Scene({ phase, marker, gizmo, meshUrl, glbUrl }: ViewportProps) {
+function Scene({ phase, marker, gizmo, meshUrl, glbUrl, showSupports, pillars, supportBaseZ }: ViewportProps & { showSupports: boolean }) {
   // Textured meshgen preview takes precedence; else the STL build; else the empty bed.
   if (glbUrl) return <LoadedGlb url={glbUrl} />;
   if (!meshUrl) return bedGrid(0);
-  return <LoadedModel url={meshUrl} phase={phase} marker={marker} gizmo={gizmo} />;
+  return (
+    <LoadedModel
+      url={meshUrl} phase={phase} marker={marker} gizmo={gizmo}
+      showSupports={showSupports} pillars={pillars ?? null} supportBaseZ={supportBaseZ ?? null}
+    />
+  );
 }
 
-export function Viewport({ phase, marker, gizmo, loaderStatus, meshUrl, glbUrl, textured }: ViewportProps) {
+export function Viewport({ phase, marker, gizmo, loaderStatus, meshUrl, glbUrl, textured, pillars, supportBaseZ, supportsNeeded }: ViewportProps) {
+  const [showSupports, setShowSupports] = useState(false);
+  // Supports are only meaningful on the STL build (not the textured GLB) and once the model is shown.
+  const canShowSupports = !!supportsNeeded && !!meshUrl && !glbUrl && !!pillars && pillars.length > 0;
   return (
     <div style={{ flex: 1, position: "relative", minHeight: 0, overflow: "hidden", background: C.viewportBg }}>
       {loaderStatus && <PrinterLoader status={loaderStatus} variant="corner" />}
+      {canShowSupports && (
+        <button
+          onClick={() => setShowSupports((v) => !v)}
+          style={{
+            position: "absolute", top: 14, right: 14, zIndex: 3, display: "inline-flex", alignItems: "center", gap: 8,
+            height: 34, padding: "0 13px", borderRadius: 9999, cursor: "pointer",
+            fontFamily: FONT.sans, fontSize: 12.5, fontWeight: 600, letterSpacing: "-0.01em",
+            border: `1px solid ${showSupports ? C.accent : C.border}`,
+            background: showSupports ? C.accent : C.surface,
+            color: showSupports ? "#fff" : C.text2,
+            boxShadow: "0 1px 3px rgba(35,32,25,0.08)", transition: "background .15s, color .15s, border-color .15s",
+          }}
+        >
+          <span style={{ width: 9, height: 9, borderRadius: "50%", flex: "none", background: showSupports ? "#fff" : C.accent, opacity: showSupports ? 0.9 : 0.55 }} />
+          {showSupports ? "Hide supports" : "Show supports"}
+        </button>
+      )}
       {!meshUrl && (
         <div style={{ position: "absolute", inset: 0, zIndex: 2, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, pointerEvents: "none", textAlign: "center", padding: 24 }}>
           <div style={{ fontFamily: FONT.sans, fontSize: 22, fontWeight: 700, color: C.text2, letterSpacing: "-0.02em" }}>Your workspace</div>
@@ -191,7 +267,7 @@ export function Viewport({ phase, marker, gizmo, loaderStatus, meshUrl, glbUrl, 
         <directionalLight position={[40, 80, 60]} intensity={0.9} />
         <directionalLight position={[-50, 30, -40]} intensity={0.25} />
         <Suspense fallback={null}>
-          <Scene phase={phase} marker={marker} gizmo={gizmo} meshUrl={meshUrl} glbUrl={glbUrl} textured={textured} />
+          <Scene phase={phase} marker={marker} gizmo={gizmo} meshUrl={meshUrl} glbUrl={glbUrl} textured={textured} showSupports={showSupports && canShowSupports} pillars={pillars} supportBaseZ={supportBaseZ} supportsNeeded={supportsNeeded} />
         </Suspense>
         {/* wide zoom range: in close enough to inspect faces/detail, out far enough to frame big models */}
         <OrbitControls enablePan makeDefault minDistance={8} maxDistance={600} />

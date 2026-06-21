@@ -30,6 +30,9 @@ export type AgentEvent =
   // back-compatible; only multi-component Fusion builds set it.
   | { t: string; kind: "summary"; text: string; source?: string; engine?: "openscad" | "blender" | "fusion" | "nvidia" | "imported"; meshUrl?: string; parts?: { name: string; meshUrl: string }[] };
 
+/** A support pillar (mm, model coords): a vertical column from the model floor up to `topZ`. */
+export interface SupportPillar { x: number; y: number; topZ: number }
+
 /** Print Brain v1 readout — measured from the finished mesh; rendered by the Print Plan panel. */
 export interface PrintPlan {
   dimensions: { w: number; d: number; h: number };
@@ -38,7 +41,9 @@ export interface PrintPlan {
   reason: string;
   parts: { label: string; w: number; d: number; h: number }[];
   seams: { axis: "x" | "y" | "z"; at: number }[];
-  supports: { needed: boolean; reason: string };
+  // `pillars`/`baseZ` (mm, model coords) drive the viewport supports overlay; OPTIONAL → older
+  // events/plans without them still render (text-only "supports recommended"), back-compatible.
+  supports: { needed: boolean; reason: string; pillars?: SupportPillar[]; baseZ?: number };
   download: { stlUrl: string; storageUrl?: string };
 }
 

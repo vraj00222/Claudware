@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  parseStlTriangles, boundingBox, analyzeOverhangs, planSplit, DEFAULT_BED, buildPrintPlan,
+  parseStlTriangles, boundingBox, analyzeOverhangs, computeSupportPillars, planSplit, DEFAULT_BED,
+  buildPrintPlan,
   type Tri,
 } from "../printPlan";
 
@@ -78,6 +79,36 @@ describe("analyzeOverhangs", () => {
   });
   it("flags support for an elevated downward face (ceiling/overhang)", () => {
     expect(analyzeOverhangs([up(0), down(20)]).needed).toBe(true);
+  });
+});
+
+// a small downward-facing facet (normal -Z) centered near (x,y) at height z → an overhang.
+const downAt = (x: number, y: number, z: number): Tri =>
+  [ { x, y, z }, { x, y: y + 2, z }, { x: x + 2, y, z } ];
+
+describe("computeSupportPillars", () => {
+  it("emits no pillars for grounded / support-free geometry", () => {
+    expect(computeSupportPillars([up(0), down(0)]).pillars).toHaveLength(0);
+  });
+  it("drops pillars under elevated overhangs, based at the model floor", () => {
+    // a 'tabletop on legs': downward roof faces at z=40 over two footprints; floor at z=0.
+    const { pillars, baseZ } = computeSupportPillars([up(0), downAt(0, 0, 40), downAt(30, 0, 40)]);
+    expect(pillars.length).toBeGreaterThanOrEqual(2);
+    expect(baseZ).toBe(0);
+    for (const p of pillars) expect(p.topZ).toBeCloseTo(40, 1);
+  });
+  it("clusters many overhang faces into a sane grid-snapped set", () => {
+    const tris: Tri[] = [up(0)];
+    for (let i = 0; i < 60; i++) tris.push(downAt(i * 0.1, 0, 30)); // 60 faces in a ~5mm footprint
+    const { pillars } = computeSupportPillars(tris);
+    expect(pillars.length).toBeGreaterThan(0);
+    expect(pillars.length).toBeLessThan(60);
+  });
+  it("caps the number of pillars on dense overhang fields", () => {
+    const tris: Tri[] = [up(0)];
+    for (let i = 0; i < 50; i++) for (let j = 0; j < 50; j++) tris.push(downAt(i * 6, j * 6, 25));
+    const { pillars } = computeSupportPillars(tris); // 2500 cells → capped at 200
+    expect(pillars.length).toBeLessThanOrEqual(200);
   });
 });
 
